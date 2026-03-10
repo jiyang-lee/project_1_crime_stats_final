@@ -1,0 +1,13 @@
+# 가상환경 및 라이브러리 (용량이 크고 팀원마다 다를 수 있음)
+.venv/
+__pycache__/
+*.pyc
+
+# 도구 및 설정 파일 (팀원들과 공유할 필요 없음)
+.python-version
+pyproject.toml
+uv.lock
+
+# 운영체제 및 에디터 설정
+.DS_Store
+.vscode/
