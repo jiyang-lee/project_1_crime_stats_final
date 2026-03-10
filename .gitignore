@@ -11,3 +11,5 @@ uv.lock
 # 운영체제 및 에디터 설정
 .DS_Store
 .vscode/
+
+/practice_police_orm.ipynb
