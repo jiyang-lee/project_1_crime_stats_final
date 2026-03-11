@@ -5,14 +5,15 @@ import pandas as pd
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 sys.path.append(BASE_DIR)
 
-from orm.database import SessionLocal, create_database, get_db
-from orm.model import RegionMaster, CrimeCategory, CrimeRegion, CrimeTime, CrimeWeek, RegionMapper
+from orm.database import SessionLocal, create_database, get_db, engine
+from orm.model import Base,RegionMaster, CrimeCategory, CrimeRegion, CrimeTime, CrimeWeek, RegionMapper
 
 
 REGION_DATA_PATH = os.path.join(BASE_DIR, "data", "police_region_fix.csv")
 WEEK_DATA_PATH = os.path.join(BASE_DIR, "data", "police_week_fix.csv")
 TIME_DATA_PATH = os.path.join(BASE_DIR, "data", "police_time_fix.csv")
 MAPPING_DATA_PATH = os.path.join(BASE_DIR, "data", "mapping_fix.csv")
+
 
 ### 1. Region_master 함수 ###
 

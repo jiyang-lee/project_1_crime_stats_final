@@ -2,9 +2,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from .model import Base
 from contextlib import contextmanager # 추가
+import os
 
 # 1. DB 경로
-DATABASE_URL = "sqlite:///crime_db.db"
+BASE_DIR     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH      = os.path.join(BASE_DIR, "crime_db.db")
+DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # 2. 엔진 생성
 engine = create_engine(
@@ -41,3 +44,4 @@ def get_db():
         raise
     finally:
         db.close()
+
