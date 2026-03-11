@@ -50,7 +50,7 @@ class HotspotAPI(Base):
     temp = Column(Float)
     update_time = Column(String)
     collected_at = Column(String)
-    mapper = relationship("RegionMapper", back_populates="hotspot", uselist=False)
+    mapper = relationship("RegionMapper", back_populates="hotspot")
 
 class CrimeRegion(Base):
     """지역별 범죄 통계"""
