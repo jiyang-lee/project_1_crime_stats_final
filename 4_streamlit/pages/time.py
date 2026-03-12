@@ -38,6 +38,16 @@ html, body, [class*="css"], .stMarkdown, .stMetric, .stDataFrame, button, input,
     margin-bottom: 16px;
     letter-spacing: 0.2px;
 }
+.page-eyebrow {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 800;
+    color: #1a6fc4;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    line-height: 1.25;
+    margin: 0 0 6px 2px;
+}
 
 .section-title {
     font-size: 26px;
@@ -159,14 +169,9 @@ peak_row = df_time.iloc[df_time["범죄건수"].idxmax()] if len(df_time) else p
 low_row = df_time.iloc[df_time["범죄건수"].idxmin()] if len(df_time) else pd.Series({"시간대": "-", "범죄건수": 0, "위험지수": 0})
 danger_count = int((df_time["위험지수"] >= danger_threshold).sum()) if len(df_time) else 0
 
-st.markdown(
-    f"""
-<div style='font-size:11px;font-weight:700;color:#1a6fc4;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:4px;'>TIME CRIME ANALYSIS</div>
-<div class='page-title'>🚓 {selected_sub} 시간대별 범죄 통계 분석</div>
-<div class='page-sub'>발생 건수 · 위험지수 · 집중 시간대를 카드형 대시보드로 제공합니다.</div>
-""",
-    unsafe_allow_html=True,
-)
+st.markdown("<div class='page-eyebrow'>TIME CRIME ANALYSIS</div>", unsafe_allow_html=True)
+st.markdown("<div class='page-title'>🚓 시간대별 범죄 통계 분석</div>", unsafe_allow_html=True)
+st.markdown("<div class='page-sub'>발생 건수 · 위험지수 · 집중 시간대를 카드형 대시보드로 제공합니다.</div>", unsafe_allow_html=True)
 
 col_left, col_right = st.columns([2, 2.3])
 
@@ -177,7 +182,7 @@ with col_left:
 
         metric_card = (
             "background:#fff;border-radius:12px;padding:14px 16px;"
-            "border:2px solid #c9d7e6;margin:4px 4px 8px 4px;min-height:112px;"
+            "border:2px solid #c9d7e6;margin:4px 4px 8px 4px;height:140px;"
         )
 
         m1.markdown(
@@ -210,30 +215,42 @@ with col_left:
             unsafe_allow_html=True,
         )
 
+    # spacer so metric card and risk card are visually separated
+    st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
+
     with st.container(border=True):
-        st.markdown("<div class='card-label'>⚠️ 시간대 위험지수 순위</div>", unsafe_allow_html=True)
-        risk_sorted = df_time.sort_values("위험지수", ascending=False).reset_index(drop=True)
+        st.markdown("<div class='card-label'>⚠️ 시간대 위험지수</div>", unsafe_allow_html=True)
+        # 시간대 기준 오름차순 정렬 (시작시간 기준)
+        risk_sorted = df_time.sort_values(by="시간대", key=lambda s: s.map(extract_start_hour)).reset_index(drop=True)
         max_risk = float(risk_sorted["위험지수"].max()) if len(risk_sorted) else 1.0
 
+        # 개별 행을 안전하게 문자열로 생성하여 리스트에 모은 뒤 한 번에 렌더
         risk_rows = []
         for _, row in risk_sorted.iterrows():
             val = float(row["위험지수"])
             width = max(min((val / max_risk) * 100, 100), 6)
             is_danger = val >= danger_threshold
             color = "#e85d5d" if is_danger else "#2e9e6b"
+
+            # 폰트 크기 약간 증가(약 +2px) 및 행 최소 높이 조정
             risk_rows.append(
                 f"""
-<div style='display:grid;grid-template-columns:95px 1fr 74px;column-gap:10px;align-items:center;margin-bottom:9px;'>
-  <div style='font-size:13px;color:#4a6080;font-weight:600;'>{row['시간대']}</div>
-  <div style='height:8px;background:#edf2f7;border-radius:999px;overflow:hidden;'>
-    <div style='height:100%;width:{width:.1f}%;background:{color};border-radius:999px;'></div>
-  </div>
-  <div style='font-size:12px;text-align:right;font-weight:800;color:{color};'>{int(val)}</div>
+<div style='display:grid;grid-template-columns:95px 1fr 74px;column-gap:12px;align-items:center;margin-bottom:10px;min-height:30px;'>
+    <div style='font-size:15px;color:#4a6080;font-weight:600;'>{row['시간대']}</div>
+    <div style='height:10px;background:#edf2f7;border-radius:999px;overflow:hidden;'>
+        <div style='height:100%;width:{width:.1f}%;background:{color};border-radius:999px;'></div>
+    </div>
+    <div style='font-size:14px;text-align:right;font-weight:800;color:{color};'>{int(val)}</div>
 </div>
 """
             )
 
-        st.markdown("".join(risk_rows), unsafe_allow_html=True)
+        # 고정 높이 스크롤 영역으로 만들어 오른쪽 차트 높이와 시각적으로 맞춤
+        # metric height (140) + spacer (20) + risk (400) = chart height (560)
+        st.markdown(
+            f"<div style='height:330px; overflow-y:auto; padding-right:8px;'>{''.join(risk_rows)}</div>",
+            unsafe_allow_html=True,
+        )
 
 with col_right:
     with st.container(border=True):
@@ -251,33 +268,13 @@ with col_right:
                 name="범죄건수",
             )
         )
-        fig.add_trace(
-            go.Scatter(
-                x=df_time["시간대"],
-                y=df_time["위험지수"],
-                mode="lines+markers",
-                line=dict(color="#1a6fc4", width=3),
-                marker=dict(size=7),
-                yaxis="y2",
-                name="위험지수",
-            )
-        )
-        fig.add_hline(
-            y=danger_threshold,
-            yref="y2",
-            line_dash="dot",
-            line_color="#f39c12",
-            annotation_text=f"주의 기준 {danger_threshold}",
-            annotation_position="top left",
-        )
-
+        # (변경) 꺾은선(위험지수)을 제거하고 막대만 표시
         fig.update_layout(
             template="plotly_white",
-            height=570,
+            height=560,
             margin=dict(l=12, r=12, t=12, b=12),
             xaxis=dict(title=None, tickangle=-20),
             yaxis=dict(title="범죄건수", showgrid=True, gridcolor="#eef2f7"),
-            yaxis2=dict(title="위험지수", overlaying="y", side="right", showgrid=False),
             legend=dict(orientation="h", yanchor="bottom", y=1.01, x=0),
         )
         st.plotly_chart(fig, use_container_width=True)
