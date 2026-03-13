@@ -4,6 +4,8 @@ import plotly.graph_objects as go
 from orm.database import get_db
 from orm.model import HotspotAPI
 
+st.set_page_config(page_title="실시간 범죄 위험도 분석", page_icon="🛡️", layout="wide")
+
 CONGEST_ORDER = {'붐빔': 0, '약간 붐빔': 1, '보통': 2, '여유': 3, '원활': 4}
 
 # 강력범죄 → 여유/원활일수록 위험 (인적 드묾)
@@ -100,7 +102,7 @@ df          = load_hotspot()
 update_time = str(df['update_time'].iloc[0])[:16] if not df.empty else '-'
 
 # ════════════════════════════════════════════════════════════
-# 스타일 및 헤더 (region.py 구조 반영)
+# 공통 스타일 (home 제외 다른 페이지와 타이틀 위치 정렬)
 # ════════════════════════════════════════════════════════════
 st.markdown(
     """
@@ -123,14 +125,6 @@ html, body, [class*="css"], .stMarkdown, .stMetric, .stDataFrame, button, input,
     letter-spacing: 0.2px;
 }
 
-.map-label {
-    font-size: 13px; font-weight: 700; color: #e11d48;
-    letter-spacing: 0.3px;
-    padding: 8px 4px 10px 4px;
-    margin-bottom: 2px;
-    border-bottom: 2px solid #e8eef5;
-}
-
 /* ── 사이드바 ── */
 section[data-testid="stSidebar"] {
     background: #1F3B5B;
@@ -138,24 +132,33 @@ section[data-testid="stSidebar"] {
 }
 section[data-testid="stSidebar"] * { color: #cce0f5 !important; }
 
+/* ── 컬럼 간격 ── */
+div[data-testid="stHorizontalBlock"] { gap: 1.2rem; }
+
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-st.markdown(f"""
-<div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:1.6rem;">
+# ════════════════════════════════════════════════════════════
+# 헤더
+# ════════════════════════════════════════════════════════════
+st.markdown(
+    f"""
+<div style="display:flex; justify-content:space-between; align-items:flex-end;">
   <div>
     <div style='font-size:11px;font-weight:700;color:#e11d48;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:4px;'>REAL-TIME RISK ANALYSIS</div>
     <div class='page-title'>🛡️ 실시간 범죄 위험도 분석</div>
     <div class='page-sub'>범죄 유형을 선택하면 실시간 혼잡도 기반으로 위험 장소를 분석합니다</div>
   </div>
-  <div style="text-align:right;">
-    <div style="font-size:0.66rem; color:#9ca3af; margin-bottom:2px;">혼잡도 업데이트</div>
+  <div style="text-align:right; padding-bottom:18px;">
+    <div style="font-size:0.66rem; color:#9ca3af; margin-bottom:2px;">혼잡도 기준</div>
     <div style="font-size:0.84rem; font-weight:600; color:#374151;">🕐 {update_time}</div>
   </div>
 </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # ════════════════════════════════════════════════════════════
 # 범죄 유형 선택 버튼
@@ -188,7 +191,7 @@ for col, crime_key in zip(btn_cols, CRIME_CONFIG.keys()):
         </div>
         """, unsafe_allow_html=True)
 
-st.markdown("<div style='height:0.8rem'></div>", unsafe_allow_html=True)
+st.markdown("<div style='height:0.45rem'></div>", unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════
 # 선택된 범죄 기준 적용
@@ -213,7 +216,7 @@ top5 = danger_df.sort_values('ppltn_avg', ascending=False).head(3).reset_index(d
 st.markdown(f"""
 <div style="background:{cfg['soft']}; border:1.5px solid {cfg['border']};
             border-left:4px solid {accent}; border-radius:12px;
-            padding:0.9rem 1.1rem; margin-bottom:1.4rem;">
+            padding:0.75rem 1.0rem; margin-bottom:1.05rem;">
   <div style="font-size:0.75rem; font-weight:800; color:{accent}; margin-bottom:5px;">
     ⚠️ 위험한 상황 — {' · '.join(danger_lvls)}
   </div>
@@ -224,12 +227,11 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 # 지도 + TOP 5
 # ════════════════════════════════════════════════════════════
-map_col, panel_col = st.columns([2, 2.3])
+map_col, panel_col = st.columns([6, 4], gap="large")
 
 # ── 지도 ─────────────────────────────────────────────────────────────────────
 with map_col:
-    with st.container(border=True):
-        st.markdown(f"<div class='map-label' style='color:#12263a;'>🗺️ {' · '.join(danger_lvls)} 지역 집중 표시</div>", unsafe_allow_html=True)
+    st.markdown(f'<p style="font-size:0.8rem; font-weight:700; color:#374151; margin-bottom:0.25rem;">🗺️ {" · ".join(danger_lvls)} 지역 집중 표시</p>', unsafe_allow_html=True)
 
     fig = go.Figure()
 
@@ -269,24 +271,29 @@ with map_col:
             name='기타',
         ))
 
-        fig.update_layout(
-            mapbox=dict(style='carto-positron',
-                        center=dict(lat=37.5665, lon=126.978), zoom=10.3),
-            legend=dict(
-                orientation='h', yanchor='top', y=0.99, xanchor='left', x=0.01,
-                bgcolor='rgba(255,255,255,0.90)', bordercolor='#e5e7eb', borderwidth=1,
-                font=dict(size=10, color='#374151'),
-            ),
-            margin=dict(l=0, r=0, t=0, b=0),
-            height=500,
-            paper_bgcolor='white',
-        )
-        st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(
+        mapbox=dict(style='carto-positron',
+                    center=dict(lat=37.5665, lon=126.978), zoom=10.3),
+        legend=dict(
+            orientation='h', yanchor='top', y=0.99, xanchor='left', x=0.01,
+            bgcolor='rgba(255,255,255,0.90)', bordercolor='#e5e7eb', borderwidth=1,
+            font=dict(size=10, color='#374151'),
+        ),
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=480,
+        paper_bgcolor='white',
+    )
+    st.markdown('<div style="border:1px solid #e5e7eb; border-radius:14px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.07);">', unsafe_allow_html=True)
+    st.plotly_chart(fig, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ── TOP 5 패널 ────────────────────────────────────────────────────────────────
 with panel_col:
-    with st.container(border=True):
-        st.markdown(f"<div class='map-label' style='color:#12263a;'>⚠️ 지금 가장 위험한 장소 TOP 3</div>", unsafe_allow_html=True)
+    st.markdown(f"""
+    <p style="font-size:0.8rem; font-weight:700; color:#374151; margin-bottom:0.35rem;">
+      ⚠️ 지금 가장 위험한 장소 TOP 3
+    </p>
+    """, unsafe_allow_html=True)
 
     if top5.empty:
         st.markdown(f"""
@@ -306,8 +313,8 @@ with panel_col:
 
             st.markdown(f"""
             <div style="background:#ffffff; border:1px solid #f0f0f0;
-                        border-radius:14px; padding:1.2rem 1.2rem;
-                        margin-bottom:0.75rem;
+                        border-radius:14px; padding:0.88rem 1.05rem;
+                        margin-bottom:0.5rem;
                         box-shadow:0 1px 6px rgba(0,0,0,0.05);">
 
               <!-- 순위 + 장소명 -->
@@ -357,8 +364,8 @@ with panel_col:
     # 전체 위험 장소 수 요약
     st.markdown(f"""
     <div style="background:{cfg['soft']}; border:1px solid {cfg['border']};
-                border-radius:10px; padding:0.9rem 1rem; text-align:center;
-                margin-top:1.1rem;">
+                border-radius:10px; padding:0.75rem 1rem; text-align:center;
+                margin-top:0.15rem;">
       <span style="font-size:0.78rem; color:{accent}; font-weight:600;">
         현재 {selected_crime.split()[-1]} 위험 장소
       </span>
@@ -371,4 +378,5 @@ with panel_col:
       </span>
     </div>
     """, unsafe_allow_html=True)
+
 
