@@ -33,11 +33,13 @@ week = st.Page("pages/week.py", title='요일')
 # 4. 
 region = st.Page("pages/region.py", title='지역')
 
+hotspot = st.Page("pages/hotspot.py", title='핫스팟')
+
 
 # 네비게이션
 pg = st.navigation({
     "메인": [home],
-    "분석": [time,week,region],
+    "분석": [hotspot, region, time, week],
 
 })
 
