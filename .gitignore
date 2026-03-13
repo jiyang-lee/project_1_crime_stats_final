@@ -8,8 +8,13 @@ __pycache__/
 pyproject.toml
 uv.lock
 
+# Environment and Streamlit secrets
+.env
+.streamlit/secrets.toml
+
 # 운영체제 및 에디터 설정
 .DS_Store
 .vscode/
 
 /practice_police_orm.ipynb
+crime_db.db

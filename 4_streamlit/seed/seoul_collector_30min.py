@@ -27,7 +27,19 @@ except ImportError:
 # ---------------------------------
 # 2. 설정
 # ---------------------------------
-API_KEY = "[REDACTED_SEOUL_API_KEY]"
+API_KEY = os.environ.get("SEOUL_API_KEY")
+if not API_KEY:
+    try:
+        import streamlit as st
+        API_KEY = st.secrets.get("SEOUL_API_KEY")
+    except Exception:
+        API_KEY = None
+
+if not API_KEY:
+    logger.error(
+        "Missing SEOUL_API_KEY. Set the SEOUL_API_KEY environment variable or add it to .streamlit/secrets.toml/.env"
+    )
+    raise RuntimeError("Missing SEOUL_API_KEY environment variable")
 # 장소 목록 파일 경로 (현재 폴더 기준으로 재설정)
 CSV_FILE = os.path.join(BASE_DIR, "data", "서울시 주요 120장소 목록.csv")
 
