@@ -187,7 +187,7 @@ st.sidebar.markdown("""
 <hr style='border-color:#1e3d5c;margin:1rem 0 0.6rem 0;'>
 <div style='font-size:10px; color:##1E3A5F; text-align:center; line-height:1.6;'>
   데이터 출처 : 경찰청<br>
-  서울 25개 자치구 + 과체시 포함
+  서울 25개 자치구 + 과천시 포함
 </div>
 """, unsafe_allow_html=True)
 
@@ -218,7 +218,7 @@ expanded = pd.concat([expanded_focus, expanded_others], ignore_index=True)
 # ─────────────────────────────────────────
 st.markdown("""
 <div style='font-size:11px;font-weight:700;color:#1a6fc4;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:4px;'>CRIME MAP · SEOUL DISTRICT</div>
-<div class='page-title'>🗺️ 3D Pydeck 범죄 지도</div>
+<div class='page-title'>🗺️ 3D 범죄 지도</div>
 <div class='page-sub'>서울 자치구별 범죄 발생 건수 3D 시각화 &nbsp;·&nbsp; 경찰청 데이터 기반</div>
 """, unsafe_allow_html=True)
 

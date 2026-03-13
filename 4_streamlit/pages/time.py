@@ -155,7 +155,7 @@ time_order = sorted(df["시간대"].dropna().unique().tolist(), key=extract_star
 # -------------------------------------------------
 st.sidebar.markdown("""
 <div style='padding: 0.6rem 0 1rem 0;'>
-  <div style='font-size:20px; font-weight:900; letter-spacing:0.5px; color:#ffffff;'>🎯 메인 분석 범죄</div>
+  <div style='font-size:20px; font-weight:900; letter-spacing:0.5px; color:#ffffff;'>🕒 메인 분석</div>
 </div>
 """, unsafe_allow_html=True)
 st.sidebar.caption("위쪽 큰 분석 화면 변경")
@@ -163,16 +163,15 @@ selected_sub = st.sidebar.selectbox("메인 분석 범죄", sub_cats, label_visi
 
 st.sidebar.markdown("""
 <div style='padding: 0.6rem 0 1rem 0;'>
-  <div style='font-size:20px; font-weight:900; letter-spacing:0.5px; color:#ffffff;'>🧩 비교 카드 범죄</div>
+  <div style='font-size:20px; font-weight:900; letter-spacing:0.5px; color:#ffffff;'>🗂️ 비교 분석</div>
 </div>
 """, unsafe_allow_html=True)
-st.sidebar.caption("아래 여러 카드 선택 (최대 9개)")
+st.sidebar.caption("아래 여러 카드 선택")
 
 compare_subs = st.sidebar.multiselect(
-    "범죄 유형 다중 선택",
+    "목록에서 클릭해서 최대 9개까지 선택",
     sub_cats,
-    default=[selected_sub] if selected_sub else [],
-    label_visibility="collapsed"
+    default=[selected_sub],
 )
 
 if len(compare_subs) > 9:
@@ -212,9 +211,9 @@ danger_count = int((df_time["위험지수"] >= danger_threshold).sum()) if len(d
 # MAIN ANALYSIS UI
 # -------------------------------------------------
 st.markdown("""
-<div style='font-size:11px;font-weight:700;color:#1a6fc4;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:4px;'>MAIN ANALYSIS</div>
-<div class='page-title'>🎯 시간대별 범죄 메인 분석</div>
-<div class='page-sub'>사이드바의 <b>메인 분석 범죄</b> 선택값 기준으로 표시됩니다.</div>
+<div style='font-size:11px;font-weight:700;color:#1a6fc4;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:4px;'>TIME-BASED CRIME ANALYSIS</div>
+<div class='page-title'>🕒 시간대별 범죄 메인 분석</div>
+<div class='page-sub'>사이드바의 <b>메인 분석 </b> 선택값 기준으로 표시됩니다.</div>
 """, unsafe_allow_html=True)
 
 col_left, col_right = st.columns([2, 2.3])
@@ -260,7 +259,7 @@ with col_left:
         )
 
     with st.container(border=True):
-        st.markdown("<div class='map-label'>⚠️ 시간대 위험지수</div>", unsafe_allow_html=True)
+        st.markdown("<div class='map-label'>⚠️ 시간대별 위험지수</div>", unsafe_allow_html=True)
         risk_sorted = df_time.copy().reset_index(drop=True)
         max_risk = float(risk_sorted["위험지수"].max()) if len(risk_sorted) else 1.0
 
@@ -272,7 +271,7 @@ with col_left:
             color = "#e85d5d" if is_danger else "#2e9e6b"
             risk_rows.append(
                 f"""
-<div style='display:grid;grid-template-columns:95px 1fr 74px;column-gap:10px;align-items:center;margin-bottom:9px;'>
+<div style='display:grid;grid-template-columns:95px 1fr 74px;column-gap:0px;align-items:center;margin-bottom:20px;'>
   <div style='font-size:13px;color:#4a6080;font-weight:600;'>{row['시간대']}</div>
   <div style='height:8px;background:#edf2f7;border-radius:999px;overflow:hidden;'>
     <div style='height:100%;width:{width:.1f}%;background:{color};border-radius:999px;'></div>
@@ -320,11 +319,11 @@ with col_right:
 # COMPARE CARDS (BOTTOM)
 # -------------------------------------------------
 st.markdown(
-    "<div style='font-size:11px;font-weight:700;color:#1a6fc4;letter-spacing:2.5px;text-transform:uppercase;margin-top:2rem;margin-bottom:2px;'>COMPARE CARDS</div>"
-    "<div class='section-title' style='margin-top:0;'>🧩 비교 범죄 카드</div>",
+    "<div style='font-size:11px;font-weight:700;color:#1a6fc4;letter-spacing:2.5px;text-transform:uppercase;margin-top:2rem;margin-bottom:2px;'>CRIME SUMMARY CARD</div>"
+    "<div class='section-title' style='margin-top:0;'>🗂️ 범죄별 요약 카드 </div>",
     unsafe_allow_html=True,
 )
-st.caption("사이드바의 '비교 카드 범죄'에서 다중 선택한 범죄들이 여기에 표시됩니다.")
+st.caption("사이드바의 '비교 분석'에서 선택한 범죄들이 여기에 표시됩니다.")
 
 if compare_subs:
     for row_start in range(0, len(compare_subs), 3):

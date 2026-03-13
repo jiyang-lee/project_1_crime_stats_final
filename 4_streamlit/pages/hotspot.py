@@ -147,7 +147,7 @@ st.markdown(
     f"""
 <div style="display:flex; justify-content:space-between; align-items:flex-end;">
   <div>
-    <div style='font-size:11px;font-weight:700;color:#e11d48;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:4px;'>REAL-TIME RISK ANALYSIS</div>
+    <div style='font-size:11px;font-weight:700;color:#1a6fc4;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:4px;'>REAL-TIME RISK ANALYSIS</div>
     <div class='page-title'>🛡️ 실시간 범죄 위험도 분석</div>
     <div class='page-sub'>범죄 유형을 선택하면 실시간 혼잡도 기반으로 위험 장소를 분석합니다</div>
   </div>
