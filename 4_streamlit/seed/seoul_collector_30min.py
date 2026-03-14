@@ -172,7 +172,12 @@ def fetch_api_data(hotspot: str, api_key: str) -> dict[str, Any] | None:
 
         soup = BeautifulSoup(response.text, "xml")
         if not soup.find("AREA_NM"):
-            logger.warning("API 응답에 AREA_NM 없음: %s", hotspot)
+            result = soup.find("RESULT")
+            code_el = result.find("CODE") if result else soup.find("CODE")
+            msg_el = result.find("MESSAGE") if result else soup.find("MESSAGE")
+            code = code_el.text.strip() if code_el and code_el.text else "-"
+            msg = msg_el.text.strip() if msg_el and msg_el.text else "-"
+            logger.warning("API 응답에 AREA_NM 없음 (%s): %s %s", hotspot, code, msg)
             return None
 
         def get_tag_text(tag: str) -> str | None:
