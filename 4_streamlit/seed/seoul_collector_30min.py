@@ -15,6 +15,10 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent # 4_streamlit 폴더 기준
 sys.path.append(str(BASE_DIR))
 
+# 로깅 설정을 초기에 해두어 파일 전체에서 사용 가능하도록 함
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
+
 # database.py와 models.py에서 필요한 객체 임포트
 # (파일명이나 경로가 다를 경우 프로젝트 구조에 맞게 수정하세요)
 try:
@@ -47,8 +51,6 @@ TOTAL_CYCLE_GAP = 1800  # 30분
 CHUNK_SIZE = 20         # API 과부하 방지 분할 수집
 BATCH_GAP = 3
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
-logger = logging.getLogger(__name__)
 
 # ---------------------------------
 # 3. 데이터 로드 및 수집 함수

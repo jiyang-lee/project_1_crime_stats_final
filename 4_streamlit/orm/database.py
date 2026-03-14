@@ -1,6 +1,10 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from .model import Base
+try:
+    from .model import Base
+except Exception:
+    # Allow running this file directly (not as a package)
+    from model import Base
 from contextlib import contextmanager # 추가
 import os
 
@@ -44,4 +48,10 @@ def get_db():
         raise
     finally:
         db.close()
+
+
+if __name__ == "__main__":
+    # Allow creating the DB by running this file directly
+    create_database()
+    print(f"Database created at: {DB_PATH}")
 
