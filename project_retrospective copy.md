@@ -15,12 +15,12 @@
 - `police_region_fix.csv`: `범죄대분류`, `범죄중분류`, `지역`, `범죄건수` 컬럼으로 구간별 누적 범죄 데이터를 제공해 지역 hex 지도 레이어의 입력으로 쓰임.
 - `police_time_fix.csv`: `시간대`, `시간대2` 등 시간 라벨과 `범죄건수`를 담아 위험 스코어·낮/밤 비율 계산에 활용.
 - `police_week_fix.csv`: `요일`, `발생건수`를 담아 요일별 Danger Index 및 메트릭 카드 구성을 지탱.
-- `mapping_fix.csv`, `서울시_120개_hotspot.csv`: 서울시 주요 지점(AREA_GU/AREA_NM/ENG_NM)을 RegionMaster 매핑과 HOTSPOT API 결과에 연결.
-- `서울시_120개_geodata.csv`: Polygon 좌표로 pydeck hexLayer의 공간 판단을 가능하게 하며, `data/before/` 폴더의 원본 CSV는 `_fix` 데이터 생성의 입력 역할.
+- `mapping_fix.csv`, `서울시_122개_hotspot.csv`: 서울시 주요 지점(AREA_GU/AREA_NM/ENG_NM)을 RegionMaster 매핑과 HOTSPOT API 결과에 연결.
+- `서울시_122개_geodata.csv`: Polygon 좌표로 pydeck hexLayer의 공간 판단을 가능하게 하며, `data/before/` 폴더의 원본 CSV는 `_fix` 데이터 생성의 입력 역할.
 
 ## 4. 데이터 처리 및 분석 과정
 - 전처리: `police.ipynb` 등에서 pandas로 drop 리스트를 반영한 열 제거 → 문자열 트리밍 → 불필요 범죄 필터링 → melt로 long 포맷화 → `_fix` CSV로 저장.
-- 핫스팟 매핑: 서울시 및 경찰청 지역 리스트를 조인하고 누락 행(서울대공원, 덕수궁 등)을 보완 → `mapping_fix.csv`/`서울시_120개_hotspot.csv` 생성.
+- 핫스팟 매핑: 서울시 및 경찰청 지역 리스트를 조인하고 누락 행(서울대공원, 덕수궁 등)을 보완 → `mapping_fix.csv`/`서울시_122개_hotspot.csv` 생성.
 - 시딩: `seed_all.py`가 CSV를 읽어 RegionMaster → CrimeCategory → RegionMapper → CrimeRegion/CrimeTime/CrimeWeek 순으로 ORM/SQLite에 적재.
 - 실시간 API: `seoul_collector_30min.py`는 `SEOUL_API_KEY`를 환경변수 또는 Streamlit secrets에서 확보하고 30분 주기로 HOTSPOT API를 호출해 `HotspotAPI` 테이블을 갱신.
 - 전체 파이프라인: raw CSV → 전처리 노트북 → `_fix` CSV/GeoJSON → `seed_all.py`로 ORM 채우기 → Streamlit `load_data()`/Hotspot collector → `time/week/region/hotspot` 페이지 렌더링.
@@ -43,7 +43,7 @@
 
 ## 7. 개발 과정에서의 문제와 해결
 - 원본 엑셀/CSV에 불필요 열/잘못된 지역명이 섞여 있어 `police.ipynb`에서 drop list, 문자열 strip, 숫자 타입 캐스팅/정렬을 거쳐 long 포맷을 확보하고 `police_week_fix.csv`로 저장.
-- 매핑 처리에서 서울대공원·덕수궁 등 서울 외 지역 또는 누락 행을 수동으로 추가하고 `NO` 기준 정렬 → `mapping_fix.csv`/`서울시_120개_hotspot.csv`로 반영해 ORM/Hotspot API 연결 안정화.
+- 매핑 처리에서 서울대공원·덕수궁 등 서울 외 지역 또는 누락 행을 수동으로 추가하고 `NO` 기준 정렬 → `mapping_fix.csv`/`서울시_122개_hotspot.csv`로 반영해 ORM/Hotspot API 연결 안정화.
 - Streamlit 앱 초기 실행 시 세션 캐시/DB I/O를 고려해 `@st.cache_data`와 `SessionLocal` 컨텍스트 매니저를 결합하고, DB가 비어 있으면 시드 스크립트 실행 안내 메시지(`st.warning`, `st.code`)를 띄워 UX를 개선.
 - Seoul API 키(`SEOUL_API_KEY`)는 환경변수 또는 `.streamlit/secrets.toml`에서 주입해야 하므로 `STREAMLIT_SECRETS.md`와 `.env.sample`을 통해 가이드하고, 키가 없으면 collector가 명시적으로 예외를 던져 런타임 실패를 예방.
 

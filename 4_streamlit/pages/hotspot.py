@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from orm.database import get_db
+from orm.database import SessionLocal
 from orm.model import HotspotAPI
 
 st.set_page_config(page_title="실시간 범죄 위험도 분석", page_icon="🛡️", layout="wide")
@@ -12,10 +12,10 @@ CONGEST_ORDER = {'붐빔': 0, '약간 붐빔': 1, '보통': 2, '여유': 3, '원
 # 절도범죄 → 붐빔일수록 위험 (혼잡 틈 소매치기)
 CRIME_CONFIG = {
     '🗡️ 강력범죄': {
-        'desc':         '살인·강도·강간 등 인적이 드물수록 위험합니다',
+        'desc':         '살인·강도·강간 등 인적이 드물수록 위험합니다 (혼잡도+인구수 동시 판단)',
         'danger_lvls':  ['여유', '원활'],          # 이 혼잡도가 위험
         'safe_lvls':    ['붐빔', '약간 붐빔'],
-        'danger_reason':'인적이 드물어 목격자가 없고 고립될 위험이 높습니다',
+        'danger_reason':'여유/원활이면서 인구수가 낮은 경우를 위험으로 봅니다',
         'safe_reason':  '사람이 많아 목격자가 있고 범죄 억제 효과가 있습니다',
         'accent':       '#e11d48',
         'soft':         '#fff1f2',
@@ -34,6 +34,9 @@ CRIME_CONFIG = {
         'map_color':    [22, 163, 74],
     },
 }
+
+# 강력범죄 저인구 기준(최소 인구수) 고정값
+VIOLENT_LOW_POP_THRESHOLD = 5000
 
 CONGEST_STYLE = {
     '붐빔':      {'color':'#e11d48', 'bg':'#fff1f2', 'border':'#fda4af'},
@@ -83,7 +86,7 @@ HOTSPOT_COORDS = {
 }
 
 def load_hotspot():
-    with get_db() as db:
+    with SessionLocal() as db:
         rows = (
             db.query(
                 HotspotAPI.area_name, HotspotAPI.congest_lvl,
@@ -97,6 +100,36 @@ def load_hotspot():
     df['lon'] = df['area_name'].map(lambda x: HOTSPOT_COORDS.get(x,(None,None))[1])
     df['order'] = df['congest_lvl'].map(lambda x: CONGEST_ORDER.get(x, 9))
     return df.sort_values('order').reset_index(drop=True)
+
+
+def classify_risk(df: pd.DataFrame, selected_crime: str, cfg: dict, violent_max_ppl: int):
+    """범죄 유형별 위험/안전/기타를 분류합니다."""
+    danger_lvls = cfg['danger_lvls']
+    safe_lvls = cfg['safe_lvls']
+
+    if selected_crime == '🗡️ 강력범죄':
+        # 여유/원활 + 저인구(최소 인구 기준)만 위험으로 분류
+        danger_mask = (
+            df['congest_lvl'].isin(danger_lvls)
+            & (pd.to_numeric(df['ppltn_min'], errors='coerce').fillna(0) < violent_max_ppl)
+        )
+        # 붐빔/약간붐빔은 안전, 또는 여유/원활이어도 최소인구가 충분히 높으면 안전
+        safe_mask = (
+            df['congest_lvl'].isin(safe_lvls)
+            | (
+                df['congest_lvl'].isin(danger_lvls)
+                & (pd.to_numeric(df['ppltn_min'], errors='coerce').fillna(0) >= violent_max_ppl)
+            )
+        )
+    else:
+        # 절도범죄는 기존 기준 유지: 혼잡할수록 위험
+        danger_mask = df['congest_lvl'].isin(danger_lvls)
+        safe_mask = df['congest_lvl'].isin(safe_lvls)
+
+    danger_df = df[danger_mask].copy()
+    safe_df = df[safe_mask].copy()
+    other_df = df[~(danger_mask | safe_mask)].copy()
+    return danger_df, safe_df, other_df
 
 df          = load_hotspot()
 update_time = str(df['update_time'].iloc[0])[:16] if not df.empty else '-'
@@ -203,13 +236,20 @@ danger_lvls    = cfg['danger_lvls']
 safe_lvls      = cfg['safe_lvls']
 r, g, b        = cfg['map_color']
 
-# 위험 / 안전 장소 분류
-danger_df = df[df['congest_lvl'].isin(danger_lvls)].copy()
-safe_df   = df[df['congest_lvl'].isin(safe_lvls)].copy()
-other_df  = df[~df['congest_lvl'].isin(danger_lvls + safe_lvls)].copy()
+# 강력범죄 임계값은 고정값 사용 (슬라이더 제거)
+violent_threshold = VIOLENT_LOW_POP_THRESHOLD if selected_crime == '🗡️ 강력범죄' else 0
 
-# 인구수 기준으로 TOP5 (위험 장소)
-top5 = danger_df.sort_values('ppltn_avg', ascending=False).head(3).reset_index(drop=True)
+# 위험 / 안전 장소 분류
+danger_df, safe_df, other_df = classify_risk(df, selected_crime, cfg, violent_threshold)
+
+# TOP 3 정렬 기준
+# 강력범죄: 인구가 적을수록 위험(오름차순), 절도범죄: 인구가 많을수록 위험(내림차순)
+if selected_crime == '🗡️ 강력범죄':
+    top5 = danger_df.sort_values('ppltn_avg', ascending=True).head(3).reset_index(drop=True)
+    danger_title = f"{' · '.join(danger_lvls)}"
+else:
+    top5 = danger_df.sort_values('ppltn_avg', ascending=False).head(3).reset_index(drop=True)
+    danger_title = ' · '.join(danger_lvls)
 
 # ── 설명 배너 ─────────────────────────────────────────────────────────────────
 # ── 설명 배너 ─────────────────────────────────────────────────────────────────
@@ -218,7 +258,7 @@ st.markdown(f"""
             border-left:4px solid {accent}; border-radius:12px;
             padding:0.75rem 1.0rem; margin-bottom:1.05rem;">
   <div style="font-size:0.75rem; font-weight:800; color:{accent}; margin-bottom:5px;">
-    ⚠️ 위험한 상황 — {' · '.join(danger_lvls)}
+    ⚠️ 위험한 상황 — {danger_title}
   </div>
   <div style="font-size:0.78rem; color:#374151; line-height:1.65;">
     {cfg['danger_reason']}
@@ -231,7 +271,7 @@ map_col, panel_col = st.columns([6, 4], gap="large")
 
 # ── 지도 ─────────────────────────────────────────────────────────────────────
 with map_col:
-    st.markdown(f'<p style="font-size:0.8rem; font-weight:700; color:#374151; margin-bottom:0.25rem;">🗺️ {" · ".join(danger_lvls)} 지역 집중 표시</p>', unsafe_allow_html=True)
+    st.markdown(f'<p style="font-size:0.8rem; font-weight:700; color:#374151; margin-bottom:0.25rem;">🗺️ {danger_title} 지역 집중 표시</p>', unsafe_allow_html=True)
 
     fig = go.Figure()
 
@@ -250,7 +290,7 @@ with map_col:
                 f"👥 {int(row['ppltn_avg']):,}명",
                 axis=1),
             hoverinfo='text',
-            name=f"⚠️ 위험 ({' · '.join(danger_lvls)})",
+            name=f"⚠️ 위험 ({danger_title})",
         ))
 
     # 기타 장소 (흐리게)
@@ -303,13 +343,18 @@ with panel_col:
         </div>
         """, unsafe_allow_html=True)
     else:
-        for i, row in top5.iterrows():
-            rank    = i + 1
-            ppltn   = f"{int(row['ppltn_avg']):,}"
-            temp_s  = f"{row['temp']:.1f}°C" if pd.notna(row['temp']) else "—"
-            cs      = CONGEST_STYLE.get(row['congest_lvl'], CONGEST_STYLE['보통'])
+        for rank, row in enumerate(top5.itertuples(index=False), start=1):
+            ppltn_value = pd.to_numeric(row.ppltn_avg, errors='coerce')
+            ppltn_num = int(ppltn_value) if pd.notna(ppltn_value) else 0
+            ppltn = f"{ppltn_num:,}"
+
+            temp_value = pd.to_numeric(row.temp, errors='coerce')
+            temp_s = f"{float(temp_value):.1f}°C" if pd.notna(temp_value) else "—"
+
+            congest_label = str(row.congest_lvl)
+            cs = CONGEST_STYLE.get(congest_label, CONGEST_STYLE['보통'])
             # 인구수 비율로 바 너비 계산
-            bar_pct = int(min(row['ppltn_avg'] / (top5['ppltn_avg'].max() + 1) * 100, 100))
+            bar_pct = int(min(ppltn_num / (top5['ppltn_avg'].max() + 1) * 100, 100))
 
             st.markdown(f"""
             <div style="background:#ffffff; border:1px solid #f0f0f0;
@@ -329,7 +374,7 @@ with panel_col:
                   </div>
                   <span style="font-size:0.88rem; font-weight:700; color:#111827;
                                line-height:1.3; word-break:keep-all;">
-                    {row['area_name']}
+                    {str(row.area_name)}
                   </span>
                 </div>
                 <span style="font-size:0.68rem; font-weight:700;
@@ -337,7 +382,7 @@ with panel_col:
                              border:1px solid {cs['border']};
                              border-radius:6px; padding:2px 8px;
                              white-space:nowrap; flex-shrink:0; margin-left:0.4rem;">
-                  {row['congest_lvl']}
+                  {congest_label}
                 </span>
               </div>
 

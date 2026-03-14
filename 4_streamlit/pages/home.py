@@ -2,6 +2,13 @@ import streamlit as st
 import base64
 import os
 
+
+PAGE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HOTSPOT_PAGE = os.path.join(PAGE_ROOT, "pages", "hotspot.py")
+TIME_PAGE = os.path.join(PAGE_ROOT, "pages", "time.py")
+WEEK_PAGE = os.path.join(PAGE_ROOT, "pages", "week.py")
+REGION_PAGE = os.path.join(PAGE_ROOT, "pages", "region.py")
+
 BASE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
 
 def img_to_b64(path):
@@ -171,13 +178,13 @@ _c.html("""
 # ── 네비게이션 ────────────────────────────────────────────────────────
 nav0, nav1, nav2, nav3 = st.columns(4)
 with nav0:
-    st.page_link("pages/hotspot.py", label="📍  핫스팟 분석", use_container_width=True)
+  st.page_link(HOTSPOT_PAGE, label="📍  핫스팟 분석", use_container_width=True)
 with nav1:
-    st.page_link("pages/time.py",    label="🕐  시간대 분석", use_container_width=True)
+  st.page_link(TIME_PAGE,    label="🕐  시간대 분석", use_container_width=True)
 with nav2:
-    st.page_link("pages/week.py",    label="📅  요일 분석",   use_container_width=True)
+  st.page_link(WEEK_PAGE,    label="📅  요일 분석",   use_container_width=True)
 with nav3:
-    st.page_link("pages/region.py",  label="🗺️  지역 분석",   use_container_width=True)
+  st.page_link(REGION_PAGE,  label="🗺️  지역 분석",   use_container_width=True)
 
 st.markdown("<div style='margin-top:10px;'></div>", unsafe_allow_html=True)
 
@@ -283,7 +290,7 @@ with right:
   · 공간 범위 : 서울특별시 25개 자치구 + 경기도 1개 시<br>
   · 시간 단위 : 0시 ~ 23시 (3시간 간격)<br>
   · 요일 범위 : 월요일 ~ 일요일<br>
-  · 핫스팟 : 서울시 주요 120개 장소
+  · 핫스팟 : 서울시 주요 122개 장소
   </p>
 </div>
 """, unsafe_allow_html=True)
@@ -298,9 +305,9 @@ sources = [
     ("🏛️", "경찰청 공공데이터포털",
      "5대 범죄(살인·강도·절도·폭력·성범죄) 발생 건수\n서울 25개 자치구 × 시간대 × 요일별 집계 데이터"),
     ("🗺️", "서울시 공간정보 오픈플랫폼",
-     "서울시 자치구 경계 Shapefile\n주요 120개 장소 위경도 좌표 및 영역 정보"),
+     "서울시 자치구 경계 Shapefile\n주요 122개 장소 위경도 좌표 및 영역 정보"),
     ("📡", "실시간 유동인구 API",
-     "서울시 주요 120개 핫스팟 지점의\n30분 단위 실시간 유동인구 수집 데이터"),
+     "서울시 주요 122개 핫스팟 지점의\n30분 단위 실시간 유동인구 수집 데이터"),
 ]
 for i, (col, (icon, title, desc)) in enumerate(zip([s1, s2, s3], sources)):
     with col:

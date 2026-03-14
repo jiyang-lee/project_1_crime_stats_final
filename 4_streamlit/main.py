@@ -1,5 +1,10 @@
 import streamlit as st
 import streamlit.components.v1 as components
+from pathlib import Path
+
+
+BASE_DIR = Path(__file__).resolve().parent
+PAGES_DIR = BASE_DIR / "pages"
 
 
 st.set_page_config(
@@ -8,27 +13,16 @@ st.set_page_config(
       layout="wide"
 )
 
-
-# 1. 홈 화면
-home = st.Page("pages/home.py", title='홈')
-
-# 2.
-time = st.Page("pages/time.py", title='시간')
-
-# 3. 
-week = st.Page("pages/week.py", title='요일')
-
-# 4. 
-region = st.Page("pages/region.py", title='지역')
-
-hotspot = st.Page("pages/hotspot.py", title='핫스팟')
-
-
 # 네비게이션
-pg = st.navigation({
-    "메인": [home],
-    "분석": [hotspot, region, time, week],
+home = st.Page(str(PAGES_DIR / "home.py"), title='홈')
+time = st.Page(str(PAGES_DIR / "time.py"), title='시간')
+week = st.Page(str(PAGES_DIR / "week.py"), title='요일')
+region = st.Page(str(PAGES_DIR / "region.py"), title='지역')
+hotspot = st.Page(str(PAGES_DIR / "hotspot.py"), title='핫스팟')
 
+pg = st.navigation({
+  "메인": [home],
+  "분석": [hotspot, region, time, week],
 })
 
 

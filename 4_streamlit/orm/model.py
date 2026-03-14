@@ -1,6 +1,7 @@
-import streamlit as st
-from sqlalchemy import create_engine, Column, Integer, String, Float, ForeignKey
-from sqlalchemy.orm import relationship, sessionmaker, declarative_base
+"""ORM 모델 정의: DB 테이블과 매핑되는 SQLAlchemy 클래스들입니다."""
+
+from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy.orm import relationship, declarative_base
 
 Base = declarative_base()
 
@@ -43,13 +44,15 @@ class HotspotAPI(Base):
     """핫스팟 API 정보"""
     __tablename__ = 'hotspot_api'
     id = Column(Integer, primary_key=True, autoincrement=True)
-    area_name = Column(String)
+    area_name = Column(String, index=True)
+    area_code = Column(String, index=True)
     congest_lvl = Column(Integer)
     ppltn_min = Column(Integer)
     ppltn_max = Column(Integer)
     temp = Column(Float)
     update_time = Column(String)
     collected_at = Column(String)
+    active = Column(Integer, default=1)
     mapper = relationship("RegionMapper", back_populates="hotspot")
 
 class CrimeRegion(Base):

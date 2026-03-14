@@ -1,12 +1,16 @@
+"""Database engine and session management for the project."""
+
+import os
+from contextlib import contextmanager
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+# import Base from orm.model when available, otherwise fall back to local module import
 try:
-    from .model import Base
-except Exception:
-    # Allow running this file directly (not as a package)
+    from orm.model import Base
+except ImportError:
     from model import Base
-from contextlib import contextmanager # 추가
-import os
 
 # 1. DB 경로
 BASE_DIR     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

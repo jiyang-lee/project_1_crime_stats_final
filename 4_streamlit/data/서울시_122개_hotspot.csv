@@ -8,7 +8,7 @@
 서울 마포구,관광특구,7.0,POI007,홍대 관광특구,HongDae Culture & Arts Special Tourist Zone
 서울 종로구,고궁·문화유산,8.0,POI008,경복궁,Gyeongbokgung Palace
 서울 중구,고궁·문화유산,9.0,POI009,광화문·덕수궁,Gwanghwamun & Deoksugung Palace
-서울 중구,고궁·문화유산,10.0,POI010,보신각,Bosingak
+서울 종로구,고궁·문화유산,10.0,POI010,보신각,Bosingak
 서울 강동구,고궁·문화유산,11.0,POI011,서울 암사동 유적,Amsa Prehistoric Settlement Site
 서울 종로구,고궁·문화유산,12.0,POI012,창덕궁·종묘,Changdeokgung Palace & Jongmyo Shrine
 서울 금천구,인구밀집지역,13.0,POI013,가산디지털단지역,Gasan Digital Complex station
@@ -90,6 +90,7 @@
 서울 강북구,공원,89.0,POI096,북서울꿈의숲,Dream Forest
 서울 서초구,공원,90.0,POI098,서리풀공원·몽마르뜨공원,Seoripul Park·Montmartre Park
 서울 중구,공원,91.0,POI099,서울광장,Seoul Plaza
+경기도 과천시,공원,92.0,POI100,서울대공원,Seoul Grand Park
 서울 성동구,공원,93.0,POI101,서울숲공원,Seoul Forest
 서울 광진구,공원,94.0,POI102,아차산,Achasan
 서울 영등포구,공원,95.0,POI103,양화한강공원,Yanghwa Hangang Park
@@ -102,21 +103,21 @@
 서울 송파구,공원,102.0,POI110,잠실한강공원,Jamsil Hangang Park
 서울 서초구,공원,103.0,POI111,잠원한강공원,Jamwon Hangang Park
 서울 서초구,공원,104.0,POI112,청계산,Cheonggyesan
-서울 종로구,공원,105.0,POI113,청와대,Cheongwadae
-서울 중구,발달상권,106.0,POI114,북창동 먹자골목,Bukchang-dong food alley
-서울 중구,발달상권,107.0,POI115,남대문시장,Namdaemun Market
-서울 종로구,발달상권,108.0,POI116,익선동,Ikseon-dong
-서울 양천구,인구밀집지역,109.0,POI117,신정네거리역,Shinjeongnegeori Station
-서울 송파구,인구밀집지역,110.0,POI118,잠실새내역,Jamsil Saenae Station
-서울 송파구,인구밀집지역,111.0,POI119,잠실역,Jamsil Station
-서울 송파구,발달상권,112.0,POI120,잠실롯데타워 일대,Jamsil Lotte Tower area
-서울 송파구,발달상권,113.0,POI121,송리단길·호수단길,Songridan-gil·Hosudan-gil
-서울 서대문구,발달상권,114.0,POI122,신촌 스타광장,Shinchon Star Plaza
-서울 동작구,공원,115.0,POI123,보라매공원,Boramae Park
-서울 서대문구,공원,116.0,POI124,서대문독립공원,Seodaemun Independence Park
-서울 양천구,공원,117.0,POI125,안양천,Anyangcheon River
-서울 영등포구,공원,118.0,POI126,여의서로,Yeouiseoro
-서울 송파구,공원,119.0,POI127,올림픽공원,Olympic Park
-서울 서대문구,공원,120.0,POI128,홍제폭포,Hongje Waterfall
-서울 중랑구,,,,,
-서울 노원구,,,,,
+서울 중구,발달상권,105.0,POI114,북창동 먹자골목,Bukchang-dong food alley
+서울 중구,발달상권,106.0,POI115,남대문시장,Namdaemun Market
+서울 종로구,발달상권,107.0,POI116,익선동,Ikseon-dong
+서울 양천구,인구밀집지역,108.0,POI117,신정네거리역,Shinjeongnegeori Station
+서울 송파구,인구밀집지역,109.0,POI118,잠실새내역,Jamsil Saenae Station
+서울 송파구,인구밀집지역,110.0,POI119,잠실역,Jamsil Station
+서울 송파구,발달상권,111.0,POI120,잠실롯데타워 일대,Jamsil Lotte Tower area
+서울 송파구,발달상권,112.0,POI121,송리단길·호수단길,Songridan-gil·Hosudan-gil
+서울 서대문구,발달상권,113.0,POI122,신촌 스타광장,Shinchon Star Plaza
+서울 동작구,공원,114.0,POI123,보라매공원,Boramae Park
+서울 서대문구,공원,115.0,POI124,서대문독립공원,Seodaemun Independence Park
+서울 양천구,공원,116.0,POI125,안양천,Anyangcheon River
+서울 영등포구,공원,117.0,POI126,여의서로,Yeouiseoro
+서울 송파구,공원,118.0,POI127,올림픽공원,Olympic Park
+서울 서대문구,공원,119.0,POI128,홍제폭포,Hongje Waterfall
+서울 종로구,공원,120.0,POI129,송현녹지광장,Songhyeon Green Plaza
+서울 중구,인구밀집지역,121.0,POI130,시의회 앞,City Council
+서울 중구,인구밀집지역,122.0,POI131,숭례문,Sungnyemun Gate
