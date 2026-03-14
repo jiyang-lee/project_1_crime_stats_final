@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from orm.database import SessionLocal
 from orm.model import HotspotAPI
+from seed.seoul_collector_30min import collect_and_save_once
 
 st.set_page_config(page_title="실시간 범죄 위험도 분석", page_icon="🛡️", layout="wide")
 
@@ -101,6 +102,21 @@ def load_hotspot():
     df['order'] = df['congest_lvl'].map(lambda x: CONGEST_ORDER.get(x, 9))
     return df.sort_values('order').reset_index(drop=True)
 
+df = load_hotspot()
+update_time = str(df['update_time'].iloc[0])[:16] if not df.empty else '-'
+# st.markdown(
+#     """
+#     <div style="display:flex; flex-direction:column; gap:10px;">
+#       <div style="font-size:11px; font-weight:700; letter-spacing:2.5px; color:#1a6fc4;">REAL-TIME RISK ANALYSIS</div>
+#       <div style="font-size:32px; font-weight:900; color:#12263a;">핫스팟 실시간 위험도</div>
+#       <div style="font-size:14px; color:#8fa8c0;">실시간 혼잡도 API를 기반으로 현장 대응도를 보여줍니다.</div>
+#     </div>
+#     """,
+#     unsafe_allow_html=True,
+# )
+st.session_state.setdefault("hotspot_update_msg", None)
+st.session_state.setdefault("hotspot_update_error", None)
+
 
 def classify_risk(df: pd.DataFrame, selected_crime: str, cfg: dict, violent_max_ppl: int):
     """범죄 유형별 위험/안전/기타를 분류합니다."""
@@ -130,9 +146,6 @@ def classify_risk(df: pd.DataFrame, selected_crime: str, cfg: dict, violent_max_
     safe_df = df[safe_mask].copy()
     other_df = df[~(danger_mask | safe_mask)].copy()
     return danger_df, safe_df, other_df
-
-df          = load_hotspot()
-update_time = str(df['update_time'].iloc[0])[:16] if not df.empty else '-'
 
 # ════════════════════════════════════════════════════════════
 # 공통 스타일 (home 제외 다른 페이지와 타이틀 위치 정렬)
@@ -173,25 +186,57 @@ div[data-testid="stHorizontalBlock"] { gap: 1.2rem; }
     unsafe_allow_html=True,
 )
 
-# ════════════════════════════════════════════════════════════
-# 헤더
-# ════════════════════════════════════════════════════════════
-st.markdown(
-    f"""
-<div style="display:flex; justify-content:space-between; align-items:flex-end;">
-  <div>
-    <div style='font-size:11px;font-weight:700;color:#1a6fc4;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:4px;'>REAL-TIME RISK ANALYSIS</div>
-    <div class='page-title'>🛡️ 실시간 범죄 위험도 분석</div>
-    <div class='page-sub'>범죄 유형을 선택하면 실시간 혼잡도 기반으로 위험 장소를 분석합니다</div>
-  </div>
-  <div style="text-align:right; padding-bottom:18px;">
-    <div style="font-size:0.66rem; color:#9ca3af; margin-bottom:2px;">혼잡도 기준</div>
-    <div style="font-size:0.84rem; font-weight:600; color:#374151;">🕐 {update_time}</div>
-  </div>
+HEADER_SPACER_PX = 30  # increase/decrease this value to nudge the header block downward
+st.markdown(f"<div style='height:{HEADER_SPACER_PX}px'></div>", unsafe_allow_html=True)
+
+header_cols = st.columns([20, 2], gap="large")
+with header_cols[0]:
+    st.markdown(
+        """
+<div style="display:flex; flex-direction:column; gap:4px;">
+  <div style='font-size:11px;font-weight:700;color:#1a6fc4;letter-spacing:2.5px;text-transform:uppercase;'>REAL-TIME RISK ANALYSIS</div>
+  <div class='page-title'>🛡️ 실시간 범죄 위험도 분석</div>
+  <div class='page-sub'>범죄 유형을 선택하면 실시간 혼잡도 기반으로 위험 장소를 분석합니다</div>
 </div>
 """,
-    unsafe_allow_html=True,
-)
+        unsafe_allow_html=True,
+    )
+with header_cols[1]:
+    st.markdown(
+        f"""
+<div style="text-align:right; padding-bottom:4px;">
+  <div style="font-size:0.66rem; color:#9ca3af; margin-bottom:2px;">혼잡도 기준</div>
+  <div style="font-size:0.84rem; font-weight:600; color:#374151;">🕐 {update_time}</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+    manual_refresh = st.button(
+        "▶ 업데이트",
+        key="hotspot_manual_refresh",
+        help="서울시 혼잡도 API를 호출하여 실시간 hotspot 데이터를 갱신합니다.",
+        use_container_width=True,
+    )
+    if manual_refresh:
+        st.session_state["hotspot_update_error"] = None
+        st.session_state["hotspot_update_msg"] = None
+        with st.spinner("서울시 혼잡도 데이터를 수집하는 중입니다..."):
+            try:
+                updated = collect_and_save_once()
+                df = load_hotspot()
+                update_time = str(df['update_time'].iloc[0])[:16] if not df.empty else '-'
+                if updated:
+                    st.session_state["hotspot_update_msg"] = f"{updated:,}건 완료"
+                else:
+                    st.session_state["hotspot_update_msg"] = "API 호출에는 성공했지만 새로 저장할 데이터가 없습니다."
+            except Exception as exc:
+                st.session_state["hotspot_update_error"] = f"핫스팟 수집 실패: {exc}"
+    notice = st.session_state.get("hotspot_update_msg")
+    if notice:
+        st.caption(notice)
+    error_notice = st.session_state.get("hotspot_update_error")
+    if error_notice:
+        st.error(error_notice)
 
 # ════════════════════════════════════════════════════════════
 # 범죄 유형 선택 버튼
@@ -211,7 +256,7 @@ for col, crime_key in zip(btn_cols, CRIME_CONFIG.keys()):
     if col.button(
         crime_key,
         key=f"btn_{crime_key}",
-        use_container_width=True,
+        width="stretch",
     ):
         st.session_state.crime_type = crime_key
         st.rerun()
@@ -324,7 +369,7 @@ with map_col:
         paper_bgcolor='white',
     )
     st.markdown('<div style="border:1px solid #e5e7eb; border-radius:14px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.07);">', unsafe_allow_html=True)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ── TOP 5 패널 ────────────────────────────────────────────────────────────────

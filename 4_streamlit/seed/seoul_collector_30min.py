@@ -194,6 +194,74 @@ def fetch_api_data(hotspot: str, api_key: str) -> dict[str, Any] | None:
         return None
 
 
+def collect_hotspot_data(api_key: str, hotspots: list[str]) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+
+    for i in range(0, len(hotspots), CHUNK_SIZE):
+        batch = hotspots[i : i + CHUNK_SIZE]
+        for name in batch:
+            data = fetch_api_data(name, api_key)
+            if data:
+                results.append(data)
+                logger.info("?섏쭛 ?깃났: %s", name)
+
+        if i + CHUNK_SIZE < len(hotspots):
+            time.sleep(BATCH_GAP)
+
+    return results
+
+
+def persist_hotspot_results(
+    session_factory: Any,
+    hotspot_model: Any,
+    hotspots: list[str],
+    collected_results: list[dict[str, Any]],
+) -> int:
+    if not collected_results:
+        return 0
+
+    current_names = set(hotspots)
+    updated_count = 0
+    with session_factory() as db:
+        try:
+            for item in collected_results:
+                area = item.get("area_name")
+                obj = db.query(hotspot_model).filter(hotspot_model.area_name == area).first()
+                if obj:
+                    for key, value in item.items():
+                        if hasattr(obj, key):
+                            setattr(obj, key, value)
+                    setattr(obj, "active", 1)
+                else:
+                    item_copy = dict(item)
+                    item_copy["active"] = 1
+                    db.add(hotspot_model(**item_copy))
+                updated_count += 1
+
+            db.query(hotspot_model).filter(~hotspot_model.area_name.in_(list(current_names))).update(
+                {"active": 0}, synchronize_session=False
+            )
+
+            db.commit()
+            logger.info("DB upsert ?꾨즺: %d嫄?", updated_count)
+        except Exception as exc:
+            db.rollback()
+            logger.error("DB ????ㅻ쪟: %s", exc)
+            return 0
+
+    return updated_count
+
+
+def run_collection_once(
+    api_key: str,
+    session_factory: Any,
+    hotspot_model: Any,
+    hotspots: list[str],
+) -> int:
+    collected_results = collect_hotspot_data(api_key, hotspots)
+    return persist_hotspot_results(session_factory, hotspot_model, hotspots, collected_results)
+
+
 def run_sync_collector(once: bool = False, max_hotspots: int = 0) -> None:
     api_key = load_api_key()
     if not api_key:
@@ -266,6 +334,25 @@ def run_sync_collector(once: bool = False, max_hotspots: int = 0) -> None:
         wait_time = max(0, TOTAL_CYCLE_GAP - elapsed)
         logger.info("수집 주기 완료. %d초 후 재시작", int(wait_time))
         time.sleep(wait_time)
+
+
+def collect_and_save_once(max_hotspots: int = 0) -> int:
+    api_key = load_api_key()
+    if not api_key:
+        raise RuntimeError("Missing SEOUL_API_KEY. 환경변수 또는 secrets에 세팅하세요.")
+
+    session_factory, hotspot_model, create_database = load_db_dependencies()
+    create_database()
+    hotspots = load_hotspot_names()
+    if not hotspots:
+        logger.error("수집할 장소 목록이 없습니다.")
+        return 0
+
+    if max_hotspots > 0:
+        hotspots = hotspots[:max_hotspots]
+        logger.info("수집 범위 제한: 상위 %d 장소만 수집", len(hotspots))
+
+    return run_collection_once(api_key, session_factory, hotspot_model, hotspots)
 
 
 def parse_args() -> argparse.Namespace:

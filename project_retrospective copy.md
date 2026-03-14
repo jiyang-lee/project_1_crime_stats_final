@@ -32,8 +32,10 @@
 - `pages/week.py`: CrimeWeek 데이터를 가져와 요일별 라인/바 차트와 위험 카드, `danger_threshold` 기반 스타일링을 수행.
 - `pages/region.py`: pydeck HexagonLayer를 위한 서울 좌표 + RegionMaster 매핑을 수동 관리하고, GUI 슬라이더/토글로 hex radius/elevation/pitch를 조정.
 - `pages/hotspot.py`: `HotspotAPI` 쿼리 결과를 인구/혼잡도 순으로 정렬하고 메트릭 카드/표로 출력하며, `CONGEST_ORDER`와 `CONGEST_STYLE`로 위험 레벨을 시각화. 강력범죄는 고정 저인구 기준을 사용하고 사용자 슬라이더는 제거.
+- `pages/hotspot.py`: `HotspotAPI` 쿼리 결과 기반 시각화에 더해, 화면 내 수동 갱신 버튼으로 수집기 1회 실행(`collect_and_save_once`)을 호출해 즉시 최신값 반영이 가능하도록 확장.
 - `orm/model.py` + `orm/database.py`: RegionMaster, CrimeCategory, CrimeRegion/CrimeTime/CrimeWeek, HotspotAPI 등의 테이블과 SQLite 접속/세션 유틸(`get_db`)을 정의, ORM 레이어를 통해 Streamlit과 seed/collector가 공유.
 - `seed/seoul_collector_30min.py`: CSV에서 핫스팟 목록을 불러와 API 호출, 응답 파싱 → `HotspotAPI` 테이블에 upsert/활성화(`active`) 기준으로 반영; API 키 유무를 체크해 실패 시 명시적인 오류를 띄움.
+- `seed/seoul_collector_30min.py`: API 키 로딩 경로(환경변수, `secrets.toml`, `.env`)를 다중 지원하고, 시작 시 `create_database()`로 테이블을 보장하며, `--once`, `--max-hotspots` 및 `collect_and_save_once()`로 디버그/수동 갱신 시나리오를 지원.
 - `seed/seed_all.py`: 각 CSV를 읽어 ORM 테이블을 순차적으로 채우며 중복 시드 차단 로직을 포함, `create_database()` 호출 후 `seed_all()`로 전체 파이프라인을 실행.
 
 ## 6. 분석 결과 요약
@@ -50,6 +52,8 @@
 - 루트 실행(`streamlit run main.py`)에서 `ModuleNotFoundError: orm`가 발생한 이슈는 루트 엔트리포인트에 `sys.path` 보강 로직을 추가해 해결.
 - `st.navigation` 사용 시 `st.page_link("pages/...")` 경로 해석 오류(`StreamlitPageNotFoundError`)를 경험했고, 페이지 경로를 엔트리포인트 기준 절대 경로로 통일해 해결.
 - VS Code에서 `reportMissingImports`가 반복된 문제는 `.vscode/settings.json`과 `pyrightconfig.json`을 통해 `.venv` 인터프리터/분석 경로를 고정해 해결.
+- 실행 디렉터리가 `4_streamlit`일 때 `.\.venv` 경로를 찾지 못하는 문제가 반복되어, 실행 위치별 명령(루트: `.\\.venv\\...`, `4_streamlit`: `..\\.venv\\...`)을 분리 운영하고 시드/실행 경로를 표준화.
+- `seed_all.py` 실행 후에도 시간/요일 페이지에서 비어 보이는 증상은 Streamlit 캐시 영향이 있어 `streamlit cache clear` + 프로세스 재시작 절차를 운영 가이드에 반영.
 
 ## 10. 최근 변경 요약 (2026-03-14)
 1. 서울시 핫스팟 기준 데이터를 120개에서 122개 기준으로 전환하고 파생 파일(`서울시_122개_hotspot.csv`, `서울시_122개_geodata.csv`)을 갱신.
@@ -57,6 +61,8 @@
 3. 실시간 수집기/ORM 스키마를 보강(`area_code`, `active`)해 upsert 및 비활성 처리까지 반영.
 4. `hotspot.py` 위험도 로직 중 사용자 슬라이더를 제거하고 강력범죄 기준을 고정값으로 정리.
 5. 저장소 정리 정책을 적용해 로컬 산출물(`crime_db.db` 등)은 제외하고 실행 필수 코드/데이터 중심으로 추적.
+6. 핫스팟 페이지에 수동 데이터 갱신 버튼을 추가하고, 수집기 함수를 앱 내부에서 1회 실행해 즉시 DB를 갱신하도록 연결.
+7. 수집기 실행 안정화를 위해 테이블 자동 생성/1회 실행 옵션/테스트 범위 제한 옵션을 반영하고, 경로/캐시 관련 운영 이슈를 문서화.
 
 ## 8. 배운 점
 - CSV 정제 → ORM/SQLite → Streamlit으로 이어지는 데이터 파이프라인은 다른 도시나 범죄 카테고리 확장 시에도 재사용 가능하며 `seed_all.py`가 그 핵심.
