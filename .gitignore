@@ -10,6 +10,7 @@ uv.lock
 
 # Environment and Streamlit secrets
 .streamlit/secrets.toml
+STREAMLIT_SECRETS.md
 
 # 운영체제 및 에디터 설정
 .DS_Store
@@ -18,15 +19,11 @@ uv.lock
 /practice_police_orm.ipynb
 script_tmp.py
 inspect*.py
-project_retrospective.md
-project_retrospective copy.md
 
-
-# local artifacts not required for clone/run
-4_streamlit/crime_db.db
 
 # root copy file (source-of-truth is under 4_streamlit/data)
 /서울시 주요 122장소 목록.CSV
 
 # local debug helpers
 tools/
+
