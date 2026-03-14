@@ -1,242 +1,283 @@
-"""Seoul hotspot collector: OpenAPI에서 실시간 핫스팟을 수집해 DB에 저장합니다.
+"""Seoul hotspot collector: OpenAPI에서 실시간 핫스팟을 수집해 DB에 저장합니다."""
 
-이 모듈은 `data/` 폴더의 POI CSV를 자동으로 찾아 사용합니다.
-"""
-
+import argparse
+import importlib
+import logging
 import os
 import sys
 import time
-import logging
-import importlib
-from pathlib import Path
 from datetime import datetime
-from urllib.parse import quote_plus
+from pathlib import Path
 from typing import Any, cast
+from urllib.parse import quote_plus
 
-import requests
 import pandas as pd
+import requests
 from bs4 import BeautifulSoup
 
-# 프로젝트 루트 경로 설정
-BASE_DIR = Path(__file__).resolve().parent.parent  # 4_streamlit 폴더 기준
-sys.path.append(str(BASE_DIR))
+try:
+    import tomllib
+except Exception:  # pragma: no cover
+    tomllib = None  # type: ignore[assignment]
 
-# 로깅
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-# DB 관련 객체: SessionLocal, HotspotAPI
+TOTAL_CYCLE_GAP = 1800
+CHUNK_SIZE = 20
+BATCH_GAP = 3
+
 SessionLocal = None
 HotspotAPI = None
+CreateDatabase = None
 DB_IMPORT_ERROR = None
 
-try:
-    orm_dir = BASE_DIR / "orm"
-    if str(orm_dir) not in sys.path:
-        sys.path.append(str(orm_dir))
 
-    database_mod = importlib.import_module("database")
-    model_mod = importlib.import_module("model")
-    SessionLocal = getattr(database_mod, "SessionLocal", None)
-    HotspotAPI = getattr(model_mod, "HotspotAPI", None)
-except Exception as exc:
-    DB_IMPORT_ERROR = exc
+def load_api_key() -> str | None:
+    key = os.environ.get("SEOUL_API_KEY")
+    if key:
+        return key.strip()
 
-# ---------------------------------
-# 2. 설정
-# ---------------------------------
-API_KEY = os.environ.get("SEOUL_API_KEY")
-if not API_KEY:
+    secrets_path = BASE_DIR.parent / ".streamlit" / "secrets.toml"
+    if tomllib and secrets_path.exists():
+        try:
+            data = tomllib.loads(secrets_path.read_text(encoding="utf-8"))
+            key = data.get("SEOUL_API_KEY")
+            if isinstance(key, str) and key.strip():
+                return key.strip()
+        except Exception as exc:
+            logger.warning("secrets.toml 파싱 실패: %s", exc)
+
+    env_path = BASE_DIR.parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+            if line.strip().startswith("SEOUL_API_KEY="):
+                key = line.split("=", 1)[1].strip().strip("\"").strip("'")
+                if key:
+                    return key
+
+    return None
+
+
+def load_db_dependencies() -> tuple[Any, Any, Any]:
+    global SessionLocal, HotspotAPI, CreateDatabase, DB_IMPORT_ERROR
+
+    if SessionLocal is not None and HotspotAPI is not None and CreateDatabase is not None:
+        return cast(Any, SessionLocal), cast(Any, HotspotAPI), cast(Any, CreateDatabase)
+
     try:
-        import streamlit as st
-        API_KEY = st.secrets.get("SEOUL_API_KEY")
-    except Exception:
-        API_KEY = None
+        from orm.database import SessionLocal as session_local  # type: ignore
+        from orm.database import create_database as create_database_fn  # type: ignore
+        from orm.model import HotspotAPI as hotspot_model  # type: ignore
 
-if not API_KEY:
-    logger.error(
-        "Missing SEOUL_API_KEY. Set the SEOUL_API_KEY environment variable or add it to .streamlit/secrets.toml/.env"
-    )
-    raise RuntimeError("Missing SEOUL_API_KEY environment variable")
-# 장소 목록 파일 discovery (현재 폴더 기준으로 재설정)
-def find_poi_csv():
+        SessionLocal = session_local
+        HotspotAPI = hotspot_model
+        CreateDatabase = create_database_fn
+    except Exception as primary_exc:
+        try:
+            orm_dir = BASE_DIR / "orm"
+            if str(orm_dir) not in sys.path:
+                sys.path.insert(0, str(orm_dir))
+            database_mod = importlib.import_module("database")
+            model_mod = importlib.import_module("model")
+            SessionLocal = getattr(database_mod, "SessionLocal", None)
+            CreateDatabase = getattr(database_mod, "create_database", None)
+            HotspotAPI = getattr(model_mod, "HotspotAPI", None)
+        except Exception as secondary_exc:
+            DB_IMPORT_ERROR = (primary_exc, secondary_exc)
+
+    if SessionLocal is None or HotspotAPI is None or CreateDatabase is None:
+        raise RuntimeError(f"DB import failed: {DB_IMPORT_ERROR}")
+
+    return cast(Any, SessionLocal), cast(Any, HotspotAPI), cast(Any, CreateDatabase)
+
+
+def find_poi_csv() -> str | None:
     data_dir = BASE_DIR / "data"
     if not data_dir.exists():
         return None
 
-    # Prefer files that look like the updated list (122) then fallback to any 서울시 주요*장소*.csv
     candidates_csv = list(data_dir.glob("*서울시*장소*.csv"))
-    candidates_CSV = list(data_dir.glob("*서울시*장소*.CSV"))
-    # On Windows, case-insensitive glob can return duplicated paths.
-    candidates = list({str(p): p for p in (candidates_csv + candidates_CSV)}.values())
-    # prefer filenames containing '122' then '120'
-    def score(p):
-        name = p.name
+    candidates_csv_upper = list(data_dir.glob("*서울시*장소*.CSV"))
+    candidates = list({str(p): p for p in (candidates_csv + candidates_csv_upper)}.values())
+
+    if not candidates:
+        return None
+
+    def score(path_obj: Path) -> int:
+        name = path_obj.name
         if "122" in name:
             return 2
         if "120" in name:
             return 1
         return 0
 
-    if not candidates:
-        return None
     candidates.sort(key=score, reverse=True)
     return str(candidates[0])
 
-TOTAL_CYCLE_GAP = 1800  # 30분
-CHUNK_SIZE = 20         # API 과부하 방지 분할 수집
-BATCH_GAP = 3
 
-
-def ensure_db_dependencies() -> tuple[Any, Any]:
-    """Return DB session factory and model class, or raise a clear runtime error."""
-    if SessionLocal is None or HotspotAPI is None:
-        raise RuntimeError(f"DB import failed: {DB_IMPORT_ERROR}")
-
-    return cast(Any, SessionLocal), cast(Any, HotspotAPI)
-
-
-# ---------------------------------
-# 3. 데이터 로드 및 수집 함수
-# ---------------------------------
-def load_hotspot_names():
-    """CSV 파일에서 장소 이름 목록을 가져옵니다.
-
-    Supports files with columns like '장소명', 'AREA_NM' or uses the first column as fallback.
-    """
+def load_hotspot_names() -> list[str]:
     csv_path = find_poi_csv()
     if not csv_path:
-        logger.error("장소 목록 CSV 파일을 찾지 못했습니다. data/ 폴더에 파일을 넣어주세요.")
+        logger.error("장소 목록 CSV 파일을 찾지 못했습니다. data 폴더를 확인하세요.")
         return []
 
     logger.info("Using POI list file: %s", csv_path)
     try:
-        df = pd.read_csv(csv_path, encoding='utf-8')
+        df = pd.read_csv(csv_path, encoding="utf-8")
     except Exception:
         try:
-            df = pd.read_csv(csv_path, encoding='cp949')
-        except Exception as e:
-            logger.error("CSV 로드 실패: %s", e)
+            df = pd.read_csv(csv_path, encoding="cp949")
+        except Exception as exc:
+            logger.error("CSV 로드 실패: %s", exc)
             return []
 
-    # common korean column names for place name
     name_cols = ["장소명", "AREA_NM", "area_name", "name", "장소_명"]
     for col in name_cols:
         if col in df.columns:
             return [str(x).strip() for x in df[col].dropna().astype(str).unique().tolist()]
 
-    # if there's a '장소코드' and '장소명' pair
-    if "장소명" in df.columns and "장소코드" in df.columns:
-        return [str(x).strip() for x in df["장소명"].dropna().astype(str).unique().tolist()]
-
-    # fallback to first column
     first_col = df.columns[0]
     return [str(x).strip() for x in df[first_col].dropna().astype(str).unique().tolist()]
 
-def fetch_api_data(hotspot):
-    """서울시 API를 호출하여 장소 정보를 가져옵니다."""
+
+def parse_int(value: str | None) -> int:
+    try:
+        return int(float(value or 0))
+    except Exception:
+        return 0
+
+
+def parse_float(value: str | None) -> float:
+    try:
+        return float(value or 0.0)
+    except Exception:
+        return 0.0
+
+
+def fetch_api_data(hotspot: str, api_key: str) -> dict[str, Any] | None:
     encoded = quote_plus(hotspot)
-    url = f"http://openapi.seoul.go.kr:8088/{API_KEY}/xml/citydata/1/1/{encoded}"
-    
+    url = f"http://openapi.seoul.go.kr:8088/{api_key}/xml/citydata/1/1/{encoded}"
+
     try:
         response = requests.get(url, timeout=15)
-        if response.status_code != 200: return None
-        
-        soup = BeautifulSoup(response.text, "xml")
-        if not soup.find("AREA_NM"): return None
+        if response.status_code != 200:
+            logger.warning("응답 코드 비정상 (%s): %s", hotspot, response.status_code)
+            return None
 
-        def get_tag_text(tag):
+        soup = BeautifulSoup(response.text, "xml")
+        if not soup.find("AREA_NM"):
+            logger.warning("API 응답에 AREA_NM 없음: %s", hotspot)
+            return None
+
+        def get_tag_text(tag: str) -> str | None:
             el = soup.find(tag)
             return el.text.strip() if el and el.text else None
 
-        # 모델 필드에 맞게 매핑
         return {
             "area_name": hotspot,
+            "area_code": get_tag_text("AREA_CD"),
             "congest_lvl": get_tag_text("AREA_CONGEST_LVL") or "정보없음",
-            "ppltn_min": int(get_tag_text("AREA_PPLTN_MIN") or 0),
-            "ppltn_max": int(get_tag_text("AREA_PPLTN_MAX") or 0),
-            "temp": float(get_tag_text("TEMP") or 0.0),
+            "ppltn_min": parse_int(get_tag_text("AREA_PPLTN_MIN")),
+            "ppltn_max": parse_int(get_tag_text("AREA_PPLTN_MAX")),
+            "temp": parse_float(get_tag_text("TEMP")),
             "update_time": get_tag_text("PPLTN_TIME") or "-",
-            "collected_at": datetime.now()
+            "collected_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
-    except Exception as e:
-        logger.error("API 호출 실패 (%s): %s", hotspot, e)
+    except Exception as exc:
+        logger.error("API 호출 실패 (%s): %s", hotspot, exc)
         return None
 
-# ---------------------------------
-# 4. 메인 실행 루프
-# ---------------------------------
-def run_sync_collector():
-    session_factory, hotspot_model = ensure_db_dependencies()
+
+def run_sync_collector(once: bool = False, max_hotspots: int = 0) -> None:
+    api_key = load_api_key()
+    if not api_key:
+        raise RuntimeError("Missing SEOUL_API_KEY. 환경변수, .streamlit/secrets.toml, .env를 확인하세요.")
+
+    session_factory, hotspot_model, create_database = load_db_dependencies()
+    create_database()
     hotspots = load_hotspot_names()
     if not hotspots:
         logger.error("수집할 장소 목록이 없습니다. 종료합니다.")
         return
 
-    logger.info("🚀 실시간 핫스팟 수집기 가동 시작")
+    if max_hotspots > 0:
+        hotspots = hotspots[:max_hotspots]
+        logger.info("디버그 모드: 상위 %d개 장소만 수집", len(hotspots))
+
+    logger.info("실시간 핫스팟 수집기 시작")
 
     while True:
         start_time = time.time()
-        collected_results = []
+        collected_results: list[dict[str, Any]] = []
 
-        # 1. 데이터 수집 단계
         for i in range(0, len(hotspots), CHUNK_SIZE):
-            batch = hotspots[i: i + CHUNK_SIZE]
+            batch = hotspots[i : i + CHUNK_SIZE]
             for name in batch:
-                data = fetch_api_data(name)
+                data = fetch_api_data(name, api_key)
                 if data:
                     collected_results.append(data)
                     logger.info("수집 성공: %s", name)
-            
+
             if i + CHUNK_SIZE < len(hotspots):
                 time.sleep(BATCH_GAP)
 
-        # 2. DB 업데이트 단계 (SessionLocal 사용) - upsert 방식 및 inactive 마크
         if collected_results:
             with session_factory() as db:
                 try:
-                    # 현재 CSV에서의 장소 목록 기준으로 active 상태를 관리
                     current_names = set(hotspots)
-
-                    # upsert: 수집된 항목은 추가/갱신, 기존 DB의 항목은 남겨두되 CSV에 없으면 inactive 처리
                     updated_count = 0
                     for item in collected_results:
-                        # item may contain area_name; we also try to use area_code if present
                         area = item.get("area_name")
                         obj = db.query(hotspot_model).filter(hotspot_model.area_name == area).first()
                         if obj:
-                            # update fields
-                            for k, v in item.items():
-                                if hasattr(obj, k):
-                                    setattr(obj, k, v)
+                            for key, value in item.items():
+                                if hasattr(obj, key):
+                                    setattr(obj, key, value)
                             setattr(obj, "active", 1)
                         else:
-                            # create new object, ensure active=1
                             item_copy = dict(item)
                             item_copy["active"] = 1
-                            new_obj = hotspot_model(**item_copy)
-                            db.add(new_obj)
+                            db.add(hotspot_model(**item_copy))
                         updated_count += 1
 
-                    # mark DB rows as inactive if their area_name is not in current_names
                     db.query(hotspot_model).filter(
                         ~hotspot_model.area_name.in_(list(current_names))
-                    ).update({"active": 0})
+                    ).update({"active": 0}, synchronize_session=False)
 
                     db.commit()
-                    logger.info("✅ DB upsert 완료: %d건 처리; CSV 기준 외 항목은 inactive 처리됨", updated_count)
-                except Exception as e:
+                    logger.info("DB upsert 완료: %d건", updated_count)
+                except Exception as exc:
                     db.rollback()
-                    logger.error("❌ DB 저장 오류: %s", e)
-        
-        # 3. 주기 대기
+                    logger.error("DB 저장 오류: %s", exc)
+        else:
+            logger.warning("이번 주기에서 수집 성공 데이터가 없습니다.")
+
+        if once:
+            logger.info("1회 실행 모드 종료")
+            return
+
         elapsed = time.time() - start_time
         wait_time = max(0, TOTAL_CYCLE_GAP - elapsed)
-        logger.info("수집 주기 완료. %d초 후 재시작합니다.", int(wait_time))
+        logger.info("수집 주기 완료. %d초 후 재시작", int(wait_time))
         time.sleep(wait_time)
 
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Seoul hotspot collector")
+    parser.add_argument("--once", action="store_true", help="한 번만 수집하고 종료")
+    parser.add_argument("--max-hotspots", type=int, default=0, help="테스트용 수집 장소 개수 제한")
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
+    args = parse_args()
     try:
-        run_sync_collector()
+        run_sync_collector(once=args.once, max_hotspots=max(0, args.max_hotspots))
     except KeyboardInterrupt:
         logger.info("수집기 수동 종료")
