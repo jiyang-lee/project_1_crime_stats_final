@@ -55,15 +55,6 @@
 - 실행 디렉터리가 `4_streamlit`일 때 `.\.venv` 경로를 찾지 못하는 문제가 반복되어, 실행 위치별 명령(루트: `.\\.venv\\...`, `4_streamlit`: `..\\.venv\\...`)을 분리 운영하고 시드/실행 경로를 표준화.
 - `seed_all.py` 실행 후에도 시간/요일 페이지에서 비어 보이는 증상은 Streamlit 캐시 영향이 있어 `streamlit cache clear` + 프로세스 재시작 절차를 운영 가이드에 반영.
 
-## 10. 최근 변경 요약 (2026-03-14)
-1. 서울시 핫스팟 기준 데이터를 120개에서 122개 기준으로 전환하고 파생 파일(`서울시_122개_hotspot.csv`, `서울시_122개_geodata.csv`)을 갱신.
-2. 루트 실행 진입점(`main.py`)을 도입해 협업자가 저장소 루트에서 동일한 명령으로 앱을 실행할 수 있도록 표준화.
-3. 실시간 수집기/ORM 스키마를 보강(`area_code`, `active`)해 upsert 및 비활성 처리까지 반영.
-4. `hotspot.py` 위험도 로직 중 사용자 슬라이더를 제거하고 강력범죄 기준을 고정값으로 정리.
-5. 저장소 정리 정책을 적용해 로컬 산출물(`crime_db.db` 등)은 제외하고 실행 필수 코드/데이터 중심으로 추적.
-6. 핫스팟 페이지에 수동 데이터 갱신 버튼을 추가하고, 수집기 함수를 앱 내부에서 1회 실행해 즉시 DB를 갱신하도록 연결.
-7. 수집기 실행 안정화를 위해 테이블 자동 생성/1회 실행 옵션/테스트 범위 제한 옵션을 반영하고, 경로/캐시 관련 운영 이슈를 문서화.
-
 ## 8. 배운 점
 - CSV 정제 → ORM/SQLite → Streamlit으로 이어지는 데이터 파이프라인은 다른 도시나 범죄 카테고리 확장 시에도 재사용 가능하며 `seed_all.py`가 그 핵심.
 - Plotly/pydeck + Streamlit Components 조합으로 정량적 Danger Index, 낮/밤, hex 지도, HOTSPOT 카드 등 다양한 뷰를 하나의 포털 안에 안정적으로 배치할 수 있다는 것을 경험.
@@ -74,3 +65,27 @@
 1. 전체 ETL을 makefile/스크립트로 묶어서 `data/before/*.csv` → `_fix` → SQLite → Streamlit(Seed+Collector)까지 자동화하고, `seed_all.py`와 `collector`를 CLI화해 테스트 가능하게 만들 것.
 2. Streamlit 페이지별 리소스(Plotly/pydeck, ORM 쿼리) 사용량을 모니터링하고 캐시 정책을 재검토해 실시간 API 실패 시 실패한 데이터를 보여줄 fallback(예: latest timestamp)과 warn/notify를 추가.
 3. GeoJSON/Spatial DB(예: GeoPackage)로 지역/핫스팟 좌표를 옮기고, Seoul HOTSPOT API 외 추가 데이터(예: 유동인구 API)를 scheduler(curl/cron/Task Scheduler) 기반으로 연동하여 파이프라인 신뢰성을 높일 것.
+
+## 10. 최근 변경 요약 (2026-03-14)
+1. 서울시 핫스팟 기준 데이터를 120개에서 122개 기준으로 전환하고 파생 파일(`서울시_122개_hotspot.csv`, `서울시_122개_geodata.csv`)을 갱신.
+2. 루트 실행 진입점(`main.py`)을 도입해 협업자가 저장소 루트에서 동일한 명령으로 앱을 실행할 수 있도록 표준화.
+3. 실시간 수집기/ORM 스키마를 보강(`area_code`, `active`)해 upsert 및 비활성 처리까지 반영.
+4. `hotspot.py` 위험도 로직 중 사용자 슬라이더를 제거하고 강력범죄 기준을 고정값으로 정리.
+5. 저장소 정리 정책을 적용해 로컬 산출물(`crime_db.db` 등)은 제외하고 실행 필수 코드/데이터 중심으로 추적.
+6. 핫스팟 페이지에 수동 데이터 갱신 버튼을 추가하고, 수집기 함수를 앱 내부에서 1회 실행해 즉시 DB를 갱신하도록 연결.
+7. 수집기 실행 안정화를 위해 테이블 자동 생성/1회 실행 옵션/테스트 범위 제한 옵션을 반영하고, 경로/캐시 관련 운영 이슈를 문서화.
+8. Streamlit Cloud 자동 반영을 위해 GitHub Actions 워크플로(`.github/workflows/hotspot-sync.yml`)를 추가하고 30분 주기 수집 → DB 커밋/푸시 파이프라인을 구성.
+9. 핫스팟 페이지 헤더에서 수동 업데이트 버튼의 위치를 ‘혼잡도 기준/시간’ 영역과 함께 노출하도록 UI를 조정하고 여백 상수로 위치 튜닝이 가능하게 정리.
+10. 자동 수집이 안정화된 이후에는 중복 실행/지연을 피하기 위해 `hotspot.py`의 수동 업데이트 버튼을 제거하고, 화면에는 갱신 시각만 노출하도록 단순화.
+
+## 11. GitHub Actions 자동 수집/배포 흐름 (2026-03-15)
+1. 목표: 사람이 버튼을 누르지 않아도, 30분마다 자동으로 데이터를 수집해서 Streamlit 화면이 최신값을 보여주게 만들기.
+2. “자동 실행 스위치”는 GitHub에 있는 `.github/workflows/hotspot-sync.yml` 파일이다. 이 파일이 있으면 GitHub가 주기적으로 Python 스크립트를 실행한다.
+3. 실행되는 내용은 단순하다: 필요한 패키지를 설치하고 `python -m 4_streamlit.seed.seoul_collector_30min --once`를 한 번 돌린다.
+4. 이 스크립트는 서울시 API 키가 필요하다. 그래서 GitHub Secrets에 `SEOUL_API_KEY`를 넣고, 워크플로가 그 값을 읽어 쓴다.
+5. 수집이 성공하면 `4_streamlit/crime_db.db` 파일이 바뀐다. 워크플로가 이 파일을 자동으로 커밋/푸시한다.
+6. Streamlit Cloud는 GitHub의 `main` 브랜치를 보고 있으니, 새 커밋이 올라오면 몇 분 안에 최신 DB로 화면이 갱신된다.
+7. 자주 막히는 포인트는 두 가지다:
+   - API 키가 틀리면 “AREA_NM 없음” 같은 경고가 뜬다. 이때 로그에 `INFO-xxx` 코드가 나오니 그 코드를 보면 원인을 알 수 있다.
+   - GitHub Actions가 커밋하려면 Repository Settings에서 `Workflow permissions`를 `Read and write`로 켜야 한다.
+8. 수동으로 바로 실행해 보고 싶다면 Actions 탭에서 `Hotspot Sync` → `Run workflow`를 누르면 된다. 이 실행이 성공하면 DB 커밋이 생기고 Streamlit도 따라 바뀐다.

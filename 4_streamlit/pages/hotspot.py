@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.graph_objects as go
 from orm.database import SessionLocal
 from orm.model import HotspotAPI
-from seed.seoul_collector_30min import collect_and_save_once
 
 st.set_page_config(page_title="실시간 범죄 위험도 분석", page_icon="🛡️", layout="wide")
 
@@ -114,8 +113,7 @@ update_time = str(df['update_time'].iloc[0])[:16] if not df.empty else '-'
 #     """,
 #     unsafe_allow_html=True,
 # )
-st.session_state.setdefault("hotspot_update_msg", None)
-st.session_state.setdefault("hotspot_update_error", None)
+
 
 
 def classify_risk(df: pd.DataFrame, selected_crime: str, cfg: dict, violent_max_ppl: int):
@@ -211,32 +209,6 @@ with header_cols[1]:
 """,
         unsafe_allow_html=True,
     )
-    manual_refresh = st.button(
-        "▶ 업데이트",
-        key="hotspot_manual_refresh",
-        help="서울시 혼잡도 API를 호출하여 실시간 hotspot 데이터를 갱신합니다.",
-        use_container_width=True,
-    )
-    if manual_refresh:
-        st.session_state["hotspot_update_error"] = None
-        st.session_state["hotspot_update_msg"] = None
-        with st.spinner("서울시 혼잡도 데이터를 수집하는 중입니다..."):
-            try:
-                updated = collect_and_save_once()
-                df = load_hotspot()
-                update_time = str(df['update_time'].iloc[0])[:16] if not df.empty else '-'
-                if updated:
-                    st.session_state["hotspot_update_msg"] = f"{updated:,}건 완료"
-                else:
-                    st.session_state["hotspot_update_msg"] = "API 호출에는 성공했지만 새로 저장할 데이터가 없습니다."
-            except Exception as exc:
-                st.session_state["hotspot_update_error"] = f"핫스팟 수집 실패: {exc}"
-    notice = st.session_state.get("hotspot_update_msg")
-    if notice:
-        st.caption(notice)
-    error_notice = st.session_state.get("hotspot_update_error")
-    if error_notice:
-        st.error(error_notice)
 
 # ════════════════════════════════════════════════════════════
 # 범죄 유형 선택 버튼
