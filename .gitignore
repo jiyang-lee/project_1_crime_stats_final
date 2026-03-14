@@ -19,6 +19,7 @@ STREAMLIT_SECRETS.md
 /practice_police_orm.ipynb
 script_tmp.py
 inspect*.py
+tmp_*.py
 
 
 # root copy file (source-of-truth is under 4_streamlit/data)
