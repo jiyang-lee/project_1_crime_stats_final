@@ -8,8 +8,9 @@
 - `1_preprocessing/`: Excel/CSV에서 불필요 열을 제거하고 문자열 트리밍·long 변환을 거쳐 `_fix` 데이터/매핑 테이블을 생성하는 Jupyter 노트북(예: `police.ipynb`, `mapping_prepro.ipynb`).
 - `2_eda/`: 정제된 CSV를 바탕으로 요일·시간대별 합계, 평균 대비 위험 지수, 낮/밤 비율 등 통계 인사이트를 정량적으로 점검하는 EDA 노트북.
 - `3_orm/` + `4_streamlit/orm/`: SQLAlchemy ORM 모델 및 SQLite 연결/세션 관리 구현으로 범죄/지역/시간/매퍼 테이블의 관계를 정리.
-- `4_streamlit/`: Streamlit 앱 본체(`main.py`, `pages/`), 정제 데이터(`data/`), 정적 자산(`static/`), 시딩 스크립트(`seed/`), `crime_db.db` 등으로 “CSV → ORM → Streamlit” 흐름을 완성.
-- `.streamlit/`, `.env.sample`, `requirements.txt`, `STREAMLIT_SECRETS.md`는 환경설정과 배포/Secrets 주입에 필요한 문서를 담고 있음.
+- `4_streamlit/`: Streamlit 앱 본체(`main.py`, `pages/`), 정제 데이터(`data/`), 정적 자산(`static/`), 시딩 스크립트(`seed/`), ORM(`orm/`)으로 “CSV → ORM → Streamlit” 흐름을 완성.
+- 루트 엔트리포인트 `main.py`를 추가해 저장소 루트에서 `streamlit run main.py`로 실행 가능하게 구성했고, `2_sub.py`/`crime_db.db` 같은 로컬 산출물은 추적 대상에서 제외함.
+- `.streamlit/`, `.env.sample`, `requirements.txt`, `STREAMLIT_SECRETS.md`, `.vscode/settings.json`, `pyrightconfig.json`은 환경설정·배포·개발환경(인터프리터/분석기) 고정에 필요한 파일로 운영함.
 
 ## 3. 데이터 설명
 - `police_region_fix.csv`: `범죄대분류`, `범죄중분류`, `지역`, `범죄건수` 컬럼으로 구간별 누적 범죄 데이터를 제공해 지역 hex 지도 레이어의 입력으로 쓰임.
@@ -26,13 +27,13 @@
 - 전체 파이프라인: raw CSV → 전처리 노트북 → `_fix` CSV/GeoJSON → `seed_all.py`로 ORM 채우기 → Streamlit `load_data()`/Hotspot collector → `time/week/region/hotspot` 페이지 렌더링.
 
 ## 5. 주요 코드 설명
-- `main.py`/`2_sub.py`: Streamlit navigation을 정의해 홈 + 시간·요일·지역·핫스팟 페이지를 등록하고 `pg.run()`으로 라우팅.
+- `main.py`(루트) + `4_streamlit/main.py`: 루트에서 실행 가능한 엔트리포인트와 실제 앱 네비게이션을 분리해 구성. 루트 실행 시 `4_streamlit`를 import 경로에 추가해 `orm` 모듈 로딩 오류를 방지.
 - `pages/time.py`: ORM에서 CrimeTime/CrimeCategory를 조인해 시간대별 총합, Danger Index, 낮·밤 비율, 비교 카드(Plotly 바+HTML)를 생성하고, `st.cache_data`로 DB I/O를 최소화.
 - `pages/week.py`: CrimeWeek 데이터를 가져와 요일별 라인/바 차트와 위험 카드, `danger_threshold` 기반 스타일링을 수행.
 - `pages/region.py`: pydeck HexagonLayer를 위한 서울 좌표 + RegionMaster 매핑을 수동 관리하고, GUI 슬라이더/토글로 hex radius/elevation/pitch를 조정.
-- `pages/hotspot.py`: `HotspotAPI` 쿼리 결과를 인구/혼잡도 순으로 정렬하고 메트릭 카드/표로 출력하며, `CONGEST_ORDER`와 `CONGEST_STYLE`로 위험 레벨을 시각화.
+- `pages/hotspot.py`: `HotspotAPI` 쿼리 결과를 인구/혼잡도 순으로 정렬하고 메트릭 카드/표로 출력하며, `CONGEST_ORDER`와 `CONGEST_STYLE`로 위험 레벨을 시각화. 강력범죄는 고정 저인구 기준을 사용하고 사용자 슬라이더는 제거.
 - `orm/model.py` + `orm/database.py`: RegionMaster, CrimeCategory, CrimeRegion/CrimeTime/CrimeWeek, HotspotAPI 등의 테이블과 SQLite 접속/세션 유틸(`get_db`)을 정의, ORM 레이어를 통해 Streamlit과 seed/collector가 공유.
-- `seed/seoul_collector_30min.py`: CSV에서 핫스팟 목록을 불러와 API 호출, 응답 파싱 → `HotspotAPI` 테이블에 덮어쓰기; API 키 유무를 체크해 실패 시 명시적인 오류를 띄움.
+- `seed/seoul_collector_30min.py`: CSV에서 핫스팟 목록을 불러와 API 호출, 응답 파싱 → `HotspotAPI` 테이블에 upsert/활성화(`active`) 기준으로 반영; API 키 유무를 체크해 실패 시 명시적인 오류를 띄움.
 - `seed/seed_all.py`: 각 CSV를 읽어 ORM 테이블을 순차적으로 채우며 중복 시드 차단 로직을 포함, `create_database()` 호출 후 `seed_all()`로 전체 파이프라인을 실행.
 
 ## 6. 분석 결과 요약
@@ -46,6 +47,16 @@
 - 매핑 처리에서 서울대공원·덕수궁 등 서울 외 지역 또는 누락 행을 수동으로 추가하고 `NO` 기준 정렬 → `mapping_fix.csv`/`서울시_122개_hotspot.csv`로 반영해 ORM/Hotspot API 연결 안정화.
 - Streamlit 앱 초기 실행 시 세션 캐시/DB I/O를 고려해 `@st.cache_data`와 `SessionLocal` 컨텍스트 매니저를 결합하고, DB가 비어 있으면 시드 스크립트 실행 안내 메시지(`st.warning`, `st.code`)를 띄워 UX를 개선.
 - Seoul API 키(`SEOUL_API_KEY`)는 환경변수 또는 `.streamlit/secrets.toml`에서 주입해야 하므로 `STREAMLIT_SECRETS.md`와 `.env.sample`을 통해 가이드하고, 키가 없으면 collector가 명시적으로 예외를 던져 런타임 실패를 예방.
+- 루트 실행(`streamlit run main.py`)에서 `ModuleNotFoundError: orm`가 발생한 이슈는 루트 엔트리포인트에 `sys.path` 보강 로직을 추가해 해결.
+- `st.navigation` 사용 시 `st.page_link("pages/...")` 경로 해석 오류(`StreamlitPageNotFoundError`)를 경험했고, 페이지 경로를 엔트리포인트 기준 절대 경로로 통일해 해결.
+- VS Code에서 `reportMissingImports`가 반복된 문제는 `.vscode/settings.json`과 `pyrightconfig.json`을 통해 `.venv` 인터프리터/분석 경로를 고정해 해결.
+
+## 10. 최근 변경 요약 (2026-03-14)
+1. 서울시 핫스팟 기준 데이터를 120개에서 122개 기준으로 전환하고 파생 파일(`서울시_122개_hotspot.csv`, `서울시_122개_geodata.csv`)을 갱신.
+2. 루트 실행 진입점(`main.py`)을 도입해 협업자가 저장소 루트에서 동일한 명령으로 앱을 실행할 수 있도록 표준화.
+3. 실시간 수집기/ORM 스키마를 보강(`area_code`, `active`)해 upsert 및 비활성 처리까지 반영.
+4. `hotspot.py` 위험도 로직 중 사용자 슬라이더를 제거하고 강력범죄 기준을 고정값으로 정리.
+5. 저장소 정리 정책을 적용해 로컬 산출물(`crime_db.db` 등)은 제외하고 실행 필수 코드/데이터 중심으로 추적.
 
 ## 8. 배운 점
 - CSV 정제 → ORM/SQLite → Streamlit으로 이어지는 데이터 파이프라인은 다른 도시나 범죄 카테고리 확장 시에도 재사용 가능하며 `seed_all.py`가 그 핵심.
