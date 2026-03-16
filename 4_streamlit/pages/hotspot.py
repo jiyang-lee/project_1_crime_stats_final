@@ -92,9 +92,10 @@ def load_hotspot():
                 HotspotAPI.area_name, HotspotAPI.congest_lvl,
                 HotspotAPI.ppltn_min, HotspotAPI.ppltn_max,
                 HotspotAPI.temp,      HotspotAPI.update_time,
+                HotspotAPI.collected_at,
             ).all()
         )
-    df = pd.DataFrame(rows, columns=['area_name','congest_lvl','ppltn_min','ppltn_max','temp','update_time'])
+    df = pd.DataFrame(rows, columns=['area_name','congest_lvl','ppltn_min','ppltn_max','temp','update_time','collected_at'])
     df['ppltn_avg'] = ((df['ppltn_min'] + df['ppltn_max']) / 2).astype(int)
     df['lat'] = df['area_name'].map(lambda x: HOTSPOT_COORDS.get(x,(None,None))[0])
     df['lon'] = df['area_name'].map(lambda x: HOTSPOT_COORDS.get(x,(None,None))[1])
@@ -104,10 +105,14 @@ def load_hotspot():
 df = load_hotspot()
 if df.empty:
     update_time = "-"
+    collected_time = "-"
 else:
     ts = pd.to_datetime(df["update_time"], errors="coerce")
     latest = ts.max()
     update_time = latest.strftime("%Y-%m-%d %H:%M") if pd.notna(latest) else str(df["update_time"].iloc[0])[:16]
+    cs = pd.to_datetime(df["collected_at"], errors="coerce")
+    clatest = cs.max()
+    collected_time = clatest.strftime("%Y-%m-%d %H:%M") if pd.notna(clatest) else str(df["collected_at"].iloc[0])[:16]
 # st.markdown(
 #     """
 #     <div style="display:flex; flex-direction:column; gap:10px;">
@@ -210,6 +215,8 @@ with header_cols[1]:
 <div style="text-align:right; padding-bottom:4px;">
   <div style="font-size:0.66rem; color:#9ca3af; margin-bottom:2px;">혼잡도 기준</div>
   <div style="font-size:0.84rem; font-weight:600; color:#374151;">🕐 {update_time}</div>
+  <div style="font-size:0.66rem; color:#9ca3af; margin:6px 0 2px;">수집 시각</div>
+  <div style="font-size:0.84rem; font-weight:600; color:#374151;">⏱ {collected_time}</div>
 </div>
 """,
         unsafe_allow_html=True,
