@@ -19,10 +19,12 @@ time = st.Page(str(PAGES_DIR / "time.py"), title='시간')
 week = st.Page(str(PAGES_DIR / "week.py"), title='요일')
 region = st.Page(str(PAGES_DIR / "region.py"), title='지역')
 hotspot = st.Page(str(PAGES_DIR / "hotspot.py"), title='핫스팟')
+admin = st.Page(str(PAGES_DIR / "admin.py"), title="관리자")
 
 pg = st.navigation({
   "메인": [home],
   "분석": [hotspot, region, time, week],
+  "관리": [admin],
 })
 
 
