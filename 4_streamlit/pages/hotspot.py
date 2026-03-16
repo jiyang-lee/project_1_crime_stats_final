@@ -102,7 +102,12 @@ def load_hotspot():
     return df.sort_values('order').reset_index(drop=True)
 
 df = load_hotspot()
-update_time = str(df['update_time'].iloc[0])[:16] if not df.empty else '-'
+if df.empty:
+    update_time = "-"
+else:
+    ts = pd.to_datetime(df["update_time"], errors="coerce")
+    latest = ts.max()
+    update_time = latest.strftime("%Y-%m-%d %H:%M") if pd.notna(latest) else str(df["update_time"].iloc[0])[:16]
 # st.markdown(
 #     """
 #     <div style="display:flex; flex-direction:column; gap:10px;">
