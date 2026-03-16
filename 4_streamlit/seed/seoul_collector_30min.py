@@ -370,6 +370,12 @@ def parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = parse_args()
     try:
-        run_sync_collector(once=args.once, max_hotspots=max(0, args.max_hotspots))
+        if args.once:
+            updated = collect_and_save_once(max_hotspots=max(0, args.max_hotspots))
+            logger.info("1회 실행 결과: %d건 저장/갱신", updated)
+            if updated <= 0:
+                raise RuntimeError("No hotspot rows were updated. Check SEOUL_API_KEY and API responses.")
+        else:
+            run_sync_collector(once=False, max_hotspots=max(0, args.max_hotspots))
     except KeyboardInterrupt:
         logger.info("수집기 수동 종료")
