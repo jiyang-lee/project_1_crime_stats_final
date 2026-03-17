@@ -202,7 +202,7 @@ if len(compare_subs) > 9:
 st.sidebar.caption(f"현재 {len(compare_subs)}개 선택됨")
 
 st.sidebar.markdown("<hr>", unsafe_allow_html=True)
-danger_threshold = 105
+danger_threshold = 100
 
 df_sel = df[df["범죄중분류"] == selected_sub].copy()
 
